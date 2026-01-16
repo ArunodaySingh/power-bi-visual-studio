@@ -4,7 +4,7 @@ import { Header } from "@/components/Header";
 import { VisualTypeSelector, type VisualType } from "@/components/VisualTypeSelector";
 import { PropertyPanel, type VisualProperties } from "@/components/PropertyPanel";
 import { DataEditor, type DataPoint } from "@/components/DataEditor";
-import { VisualPreview } from "@/components/VisualPreview";
+import { DraggableVisual } from "@/components/DraggableVisual";
 import { CodeExport } from "@/components/CodeExport";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -97,10 +97,8 @@ export default function Index() {
 
           {/* Canvas Area */}
           <div className="flex-1 p-8 bg-canvas canvas-grid overflow-auto">
-            <div className="max-w-4xl mx-auto">
-              <div className="bg-card rounded-xl border shadow-panel p-6 min-h-[400px]">
-                <VisualPreview type={visualType} data={data} properties={properties} />
-              </div>
+            <div className="flex flex-col items-center">
+              <DraggableVisual type={visualType} data={data} properties={properties} />
               
               {/* Quick Stats */}
               <div className="mt-6 grid grid-cols-3 gap-4">
