@@ -1,22 +1,22 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { Database, Settings, LayoutGrid } from "lucide-react";
 import { Header } from "@/components/Header";
 import { VisualTypeSelector, type VisualType } from "@/components/VisualTypeSelector";
 import { PropertyPanel, type VisualProperties } from "@/components/PropertyPanel";
 import { DataEditor, type DataPoint } from "@/components/DataEditor";
-import { DraggableVisual } from "@/components/DraggableVisual";
+import { VisualCanvas } from "@/components/VisualCanvas";
 import { CodeExport } from "@/components/CodeExport";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import type { CanvasVisualData } from "@/components/CanvasVisual";
 
-const initialData: DataPoint[] = [
-  { id: "1", category: "Q1 Sales", value: 85 },
-  { id: "2", category: "Q2 Sales", value: 120 },
-  { id: "3", category: "Q3 Sales", value: 95 },
-  { id: "4", category: "Q4 Sales", value: 145 },
-  { id: "5", category: "Q5 Projection", value: 110 },
+const createDefaultData = (): DataPoint[] => [
+  { id: crypto.randomUUID(), category: "Q1 Sales", value: 85 },
+  { id: crypto.randomUUID(), category: "Q2 Sales", value: 120 },
+  { id: crypto.randomUUID(), category: "Q3 Sales", value: 95 },
+  { id: crypto.randomUUID(), category: "Q4 Sales", value: 145 },
 ];
 
-const initialProperties: VisualProperties = {
+const createDefaultProperties = (): VisualProperties => ({
   title: "Sales Performance",
   showTitle: true,
   showLegend: false,
@@ -26,12 +26,66 @@ const initialProperties: VisualProperties = {
   fontSize: 14,
   borderRadius: 8,
   animationDuration: 500,
-};
+});
+
+const createNewVisual = (index: number): CanvasVisualData => ({
+  id: crypto.randomUUID(),
+  type: "bar",
+  data: createDefaultData(),
+  properties: createDefaultProperties(),
+  position: { x: 50 + (index % 3) * 50, y: 50 + Math.floor(index / 3) * 50 },
+  size: { width: 500, height: 350 },
+});
 
 export default function Index() {
-  const [visualType, setVisualType] = useState<VisualType>("bar");
-  const [data, setData] = useState<DataPoint[]>(initialData);
-  const [properties, setProperties] = useState<VisualProperties>(initialProperties);
+  const [visuals, setVisuals] = useState<CanvasVisualData[]>([createNewVisual(0)]);
+  const [selectedId, setSelectedId] = useState<string | null>(visuals[0]?.id || null);
+
+  const selectedVisual = visuals.find((v) => v.id === selectedId);
+
+  const handleAddVisual = useCallback(() => {
+    const newVisual = createNewVisual(visuals.length);
+    setVisuals((prev) => [...prev, newVisual]);
+    setSelectedId(newVisual.id);
+  }, [visuals.length]);
+
+  const handleUpdateVisual = useCallback((id: string, updates: Partial<CanvasVisualData>) => {
+    setVisuals((prev) =>
+      prev.map((v) => (v.id === id ? { ...v, ...updates } : v))
+    );
+  }, []);
+
+  const handleDeleteVisual = useCallback((id: string) => {
+    setVisuals((prev) => prev.filter((v) => v.id !== id));
+    setSelectedId((prevId) => (prevId === id ? null : prevId));
+  }, []);
+
+  const handleDuplicateVisual = useCallback((id: string) => {
+    const visual = visuals.find((v) => v.id === id);
+    if (visual) {
+      const duplicate: CanvasVisualData = {
+        ...visual,
+        id: crypto.randomUUID(),
+        position: { x: visual.position.x + 30, y: visual.position.y + 30 },
+        data: visual.data.map((d) => ({ ...d, id: crypto.randomUUID() })),
+      };
+      setVisuals((prev) => [...prev, duplicate]);
+      setSelectedId(duplicate.id);
+    }
+  }, [visuals]);
+
+  // Handlers for updating selected visual
+  const handleTypeChange = (type: VisualType) => {
+    if (selectedId) handleUpdateVisual(selectedId, { type });
+  };
+
+  const handleDataChange = (data: DataPoint[]) => {
+    if (selectedId) handleUpdateVisual(selectedId, { data });
+  };
+
+  const handlePropertiesChange = (properties: VisualProperties) => {
+    if (selectedId) handleUpdateVisual(selectedId, { properties });
+  };
 
   return (
     <div className="h-screen flex flex-col bg-background">
@@ -58,26 +112,48 @@ export default function Index() {
             
             <TabsContent value="visual" className="flex-1 p-4 overflow-y-auto">
               <div className="space-y-4">
-                <div>
-                  <h3 className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wider">
-                    Chart Type
-                  </h3>
-                  <VisualTypeSelector selected={visualType} onSelect={setVisualType} />
-                </div>
+                {selectedVisual ? (
+                  <>
+                    <div>
+                      <h3 className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wider">
+                        Chart Type
+                      </h3>
+                      <VisualTypeSelector selected={selectedVisual.type} onSelect={handleTypeChange} />
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-sm text-muted-foreground text-center py-8">
+                    Select a visual on the canvas to edit
+                  </div>
+                )}
               </div>
             </TabsContent>
             
             <TabsContent value="data" className="flex-1 p-4 overflow-y-auto">
               <div className="space-y-4">
-                <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                  Sample Data
-                </h3>
-                <DataEditor data={data} onChange={setData} />
+                {selectedVisual ? (
+                  <>
+                    <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      Sample Data
+                    </h3>
+                    <DataEditor data={selectedVisual.data} onChange={handleDataChange} />
+                  </>
+                ) : (
+                  <div className="text-sm text-muted-foreground text-center py-8">
+                    Select a visual on the canvas to edit
+                  </div>
+                )}
               </div>
             </TabsContent>
             
             <TabsContent value="format" className="flex-1 overflow-hidden m-0">
-              <PropertyPanel properties={properties} onChange={setProperties} />
+              {selectedVisual ? (
+                <PropertyPanel properties={selectedVisual.properties} onChange={handlePropertiesChange} />
+              ) : (
+                <div className="text-sm text-muted-foreground text-center py-8 px-4">
+                  Select a visual on the canvas to edit
+                </div>
+              )}
             </TabsContent>
           </Tabs>
         </aside>
@@ -87,41 +163,36 @@ export default function Index() {
           {/* Toolbar */}
           <div className="h-12 border-b bg-card px-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <span className="text-sm text-muted-foreground">Preview</span>
+              <span className="text-sm text-muted-foreground">Canvas</span>
               <span className="px-2 py-0.5 bg-accent/10 text-accent text-xs rounded font-medium">
-                {visualType.charAt(0).toUpperCase() + visualType.slice(1)} Chart
+                {visuals.length} visual{visuals.length !== 1 ? "s" : ""}
               </span>
+              {selectedVisual && (
+                <span className="px-2 py-0.5 bg-primary/10 text-primary text-xs rounded font-medium">
+                  {selectedVisual.type.charAt(0).toUpperCase() + selectedVisual.type.slice(1)} selected
+                </span>
+              )}
             </div>
-            <CodeExport type={visualType} data={data} properties={properties} />
+            {selectedVisual && (
+              <CodeExport
+                type={selectedVisual.type}
+                data={selectedVisual.data}
+                properties={selectedVisual.properties}
+              />
+            )}
           </div>
 
           {/* Canvas Area */}
-          <div className="flex-1 p-8 bg-canvas canvas-grid overflow-auto">
-            <div className="flex flex-col items-center">
-              <DraggableVisual type={visualType} data={data} properties={properties} />
-              
-              {/* Quick Stats */}
-              <div className="mt-6 grid grid-cols-3 gap-4">
-                <div className="bg-card rounded-lg border p-4 shadow-sm">
-                  <div className="text-2xl font-bold text-accent">
-                    {data.reduce((acc, d) => acc + d.value, 0)}
-                  </div>
-                  <div className="text-xs text-muted-foreground">Total Value</div>
-                </div>
-                <div className="bg-card rounded-lg border p-4 shadow-sm">
-                  <div className="text-2xl font-bold text-primary">
-                    {data.length}
-                  </div>
-                  <div className="text-xs text-muted-foreground">Data Points</div>
-                </div>
-                <div className="bg-card rounded-lg border p-4 shadow-sm">
-                  <div className="text-2xl font-bold text-success">
-                    {data.length ? Math.round(data.reduce((acc, d) => acc + d.value, 0) / data.length) : 0}
-                  </div>
-                  <div className="text-xs text-muted-foreground">Average</div>
-                </div>
-              </div>
-            </div>
+          <div className="flex-1 p-4 bg-canvas canvas-grid overflow-auto">
+            <VisualCanvas
+              visuals={visuals}
+              selectedId={selectedId}
+              onSelectVisual={setSelectedId}
+              onUpdateVisual={handleUpdateVisual}
+              onDeleteVisual={handleDeleteVisual}
+              onDuplicateVisual={handleDuplicateVisual}
+              onAddVisual={handleAddVisual}
+            />
           </div>
         </main>
       </div>
