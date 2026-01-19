@@ -7,7 +7,14 @@ import { DataEditor, type DataPoint } from "@/components/DataEditor";
 import { VisualCanvas } from "@/components/VisualCanvas";
 import { CodeExport } from "@/components/CodeExport";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { SheetTabs, type Sheet } from "@/components/SheetTabs";
 import type { CanvasVisualData } from "@/components/CanvasVisual";
+
+interface SheetData {
+  id: string;
+  name: string;
+  visuals: CanvasVisualData[];
+}
 
 const createDefaultData = (): DataPoint[] => [
   { id: crypto.randomUUID(), category: "Q1 Sales", value: 85 },
@@ -37,28 +44,87 @@ const createNewVisual = (index: number): CanvasVisualData => ({
   size: { width: 500, height: 350 },
 });
 
-export default function Index() {
-  const [visuals, setVisuals] = useState<CanvasVisualData[]>([createNewVisual(0)]);
-  const [selectedId, setSelectedId] = useState<string | null>(visuals[0]?.id || null);
+const createDefaultSheet = (name: string): SheetData => {
+  const visual = createNewVisual(0);
+  return {
+    id: crypto.randomUUID(),
+    name,
+    visuals: [visual],
+  };
+};
 
+export default function Index() {
+  const [sheets, setSheets] = useState<SheetData[]>([
+    createDefaultSheet("Meta"),
+    createDefaultSheet("GA"),
+    createDefaultSheet("DV360"),
+  ]);
+  const [activeSheetId, setActiveSheetId] = useState(sheets[0].id);
+  const [selectedId, setSelectedId] = useState<string | null>(sheets[0].visuals[0]?.id || null);
+
+  const activeSheet = sheets.find((s) => s.id === activeSheetId);
+  const visuals = activeSheet?.visuals || [];
   const selectedVisual = visuals.find((v) => v.id === selectedId);
 
-  const handleAddVisual = useCallback(() => {
-    const newVisual = createNewVisual(visuals.length);
-    setVisuals((prev) => [...prev, newVisual]);
-    setSelectedId(newVisual.id);
-  }, [visuals.length]);
+  // Sheet handlers
+  const handleSelectSheet = useCallback((id: string) => {
+    setActiveSheetId(id);
+    const sheet = sheets.find((s) => s.id === id);
+    setSelectedId(sheet?.visuals[0]?.id || null);
+  }, [sheets]);
 
-  const handleUpdateVisual = useCallback((id: string, updates: Partial<CanvasVisualData>) => {
-    setVisuals((prev) =>
-      prev.map((v) => (v.id === id ? { ...v, ...updates } : v))
+  const handleAddSheet = useCallback(() => {
+    const newSheet = createDefaultSheet(`Sheet ${sheets.length + 1}`);
+    setSheets((prev) => [...prev, newSheet]);
+    setActiveSheetId(newSheet.id);
+    setSelectedId(newSheet.visuals[0]?.id || null);
+  }, [sheets.length]);
+
+  const handleDeleteSheet = useCallback((id: string) => {
+    if (sheets.length <= 1) return;
+    setSheets((prev) => prev.filter((s) => s.id !== id));
+    if (activeSheetId === id) {
+      const remaining = sheets.filter((s) => s.id !== id);
+      setActiveSheetId(remaining[0].id);
+      setSelectedId(remaining[0].visuals[0]?.id || null);
+    }
+  }, [sheets, activeSheetId]);
+
+  const handleRenameSheet = useCallback((id: string, name: string) => {
+    setSheets((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, name } : s))
     );
   }, []);
 
+  // Visual handlers (scoped to active sheet)
+  const handleAddVisual = useCallback(() => {
+    const newVisual = createNewVisual(visuals.length);
+    setSheets((prev) =>
+      prev.map((s) =>
+        s.id === activeSheetId ? { ...s, visuals: [...s.visuals, newVisual] } : s
+      )
+    );
+    setSelectedId(newVisual.id);
+  }, [visuals.length, activeSheetId]);
+
+  const handleUpdateVisual = useCallback((id: string, updates: Partial<CanvasVisualData>) => {
+    setSheets((prev) =>
+      prev.map((s) =>
+        s.id === activeSheetId
+          ? { ...s, visuals: s.visuals.map((v) => (v.id === id ? { ...v, ...updates } : v)) }
+          : s
+      )
+    );
+  }, [activeSheetId]);
+
   const handleDeleteVisual = useCallback((id: string) => {
-    setVisuals((prev) => prev.filter((v) => v.id !== id));
+    setSheets((prev) =>
+      prev.map((s) =>
+        s.id === activeSheetId ? { ...s, visuals: s.visuals.filter((v) => v.id !== id) } : s
+      )
+    );
     setSelectedId((prevId) => (prevId === id ? null : prevId));
-  }, []);
+  }, [activeSheetId]);
 
   const handleDuplicateVisual = useCallback((id: string) => {
     const visual = visuals.find((v) => v.id === id);
@@ -69,10 +135,14 @@ export default function Index() {
         position: { x: visual.position.x + 30, y: visual.position.y + 30 },
         data: visual.data.map((d) => ({ ...d, id: crypto.randomUUID() })),
       };
-      setVisuals((prev) => [...prev, duplicate]);
+      setSheets((prev) =>
+        prev.map((s) =>
+          s.id === activeSheetId ? { ...s, visuals: [...s.visuals, duplicate] } : s
+        )
+      );
       setSelectedId(duplicate.id);
     }
-  }, [visuals]);
+  }, [visuals, activeSheetId]);
 
   // Handlers for updating selected visual
   const handleTypeChange = (type: VisualType) => {
@@ -194,6 +264,16 @@ export default function Index() {
               onAddVisual={handleAddVisual}
             />
           </div>
+
+          {/* Sheet Tabs at Bottom */}
+          <SheetTabs
+            sheets={sheets.map((s) => ({ id: s.id, name: s.name }))}
+            activeSheetId={activeSheetId}
+            onSelectSheet={handleSelectSheet}
+            onAddSheet={handleAddSheet}
+            onDeleteSheet={handleDeleteSheet}
+            onRenameSheet={handleRenameSheet}
+          />
         </main>
       </div>
     </div>
