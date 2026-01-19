@@ -1,7 +1,9 @@
-import { DndContext, DragEndEvent } from "@dnd-kit/core";
-import { Plus } from "lucide-react";
+import { DndContext, DragEndEvent, DragStartEvent, useSensor, useSensors, PointerSensor, DragOverlay } from "@dnd-kit/core";
+import { Plus, Hash, Type } from "lucide-react";
+import { useState } from "react";
 import { CanvasVisual, type CanvasVisualData } from "./CanvasVisual";
 import { Button } from "./ui/button";
+import type { DataField } from "./DataFieldsPanel";
 
 interface VisualCanvasProps {
   visuals: CanvasVisualData[];
@@ -11,6 +13,7 @@ interface VisualCanvasProps {
   onDeleteVisual: (id: string) => void;
   onDuplicateVisual: (id: string) => void;
   onAddVisual: () => void;
+  onFieldDropped?: (visualId: string, field: DataField) => void;
 }
 
 export function VisualCanvas({
@@ -21,14 +24,58 @@ export function VisualCanvas({
   onDeleteVisual,
   onDuplicateVisual,
   onAddVisual,
+  onFieldDropped,
 }: VisualCanvasProps) {
-  const handleDragEnd = (event: DragEndEvent) => {
-    const { active, delta } = event;
-    const visualId = active.id as string;
-    const visual = visuals.find((v) => v.id === visualId);
+  const [isFieldDragging, setIsFieldDragging] = useState(false);
+  const [draggingField, setDraggingField] = useState<DataField | null>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 5,
+      },
+    })
+  );
+
+  const handleDragStart = (event: DragStartEvent) => {
+    const { active } = event;
+    const id = active.id as string;
     
+    // Check if this is a field being dragged
+    if (id.startsWith("field-")) {
+      setIsFieldDragging(true);
+      const fieldData = active.data.current?.field as DataField | undefined;
+      if (fieldData) {
+        setDraggingField(fieldData);
+      }
+    }
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over, delta } = event;
+    const activeId = active.id as string;
+    
+    // Reset field dragging state
+    setIsFieldDragging(false);
+    setDraggingField(null);
+
+    // Handle field drop onto visual
+    if (activeId.startsWith("field-") && over) {
+      const overId = over.id as string;
+      if (overId.startsWith("drop-")) {
+        const visualId = overId.replace("drop-", "");
+        const fieldData = active.data.current?.field as DataField | undefined;
+        if (fieldData && onFieldDropped) {
+          onFieldDropped(visualId, fieldData);
+        }
+      }
+      return;
+    }
+
+    // Handle visual drag
+    const visual = visuals.find((v) => v.id === activeId);
     if (visual) {
-      onUpdateVisual(visualId, {
+      onUpdateVisual(activeId, {
         position: {
           x: visual.position.x + delta.x,
           y: visual.position.y + delta.y,
@@ -38,7 +85,7 @@ export function VisualCanvas({
   };
 
   return (
-    <DndContext onDragEnd={handleDragEnd}>
+    <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <div
         className="relative w-full h-full min-h-[600px] min-w-[800px]"
         onClick={() => onSelectVisual(null)}
@@ -48,6 +95,7 @@ export function VisualCanvas({
             key={visual.id}
             visual={visual}
             isSelected={selectedId === visual.id}
+            isFieldDragging={isFieldDragging}
             onSelect={() => onSelectVisual(visual.id)}
             onUpdate={(updates) => onUpdateVisual(visual.id, updates)}
             onDelete={() => onDeleteVisual(visual.id)}
@@ -82,6 +130,20 @@ export function VisualCanvas({
           </div>
         )}
       </div>
+
+      {/* Drag Overlay for fields */}
+      <DragOverlay>
+        {draggingField && (
+          <div className="flex items-center gap-2 px-3 py-2 bg-card border rounded-lg shadow-lg text-sm font-medium">
+            {draggingField.type === "metric" ? (
+              <Hash className="h-4 w-4 text-blue-500" />
+            ) : (
+              <Type className="h-4 w-4 text-amber-500" />
+            )}
+            {draggingField.name}
+          </div>
+        )}
+      </DragOverlay>
     </DndContext>
   );
 }

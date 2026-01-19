@@ -1,13 +1,13 @@
 import { useState, useRef } from "react";
-import { useDraggable } from "@dnd-kit/core";
+import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
-import { Move, Maximize2, X, Copy } from "lucide-react";
+import { Move, Maximize2, X, Copy, Plus } from "lucide-react";
 import { VisualPreview } from "./VisualPreview";
 import type { VisualType } from "./VisualTypeSelector";
 import type { VisualProperties } from "./PropertyPanel";
 import type { DataPoint } from "./DataEditor";
 import { Button } from "./ui/button";
-
+import { cn } from "@/lib/utils";
 export interface CanvasVisualData {
   id: string;
   type: VisualType;
@@ -20,6 +20,7 @@ export interface CanvasVisualData {
 interface CanvasVisualProps {
   visual: CanvasVisualData;
   isSelected: boolean;
+  isFieldDragging?: boolean;
   onSelect: () => void;
   onUpdate: (updates: Partial<CanvasVisualData>) => void;
   onDelete: () => void;
@@ -29,6 +30,7 @@ interface CanvasVisualProps {
 export function CanvasVisual({
   visual,
   isSelected,
+  isFieldDragging,
   onSelect,
   onUpdate,
   onDelete,
@@ -36,6 +38,11 @@ export function CanvasVisual({
 }: CanvasVisualProps) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: visual.id,
+  });
+
+  const { setNodeRef: setDropRef, isOver } = useDroppable({
+    id: `drop-${visual.id}`,
+    data: { visualId: visual.id },
   });
 
   const resizeRef = useRef<HTMLDivElement>(null);
@@ -75,17 +82,27 @@ export function CanvasVisual({
     document.addEventListener("mouseup", handleMouseUp);
   };
 
+  const showDropIndicator = isFieldDragging && isOver;
+
   return (
     <div
-      ref={setNodeRef}
+      ref={(node) => {
+        setNodeRef(node);
+        setDropRef(node);
+      }}
       style={style}
       onClick={(e) => {
         e.stopPropagation();
         onSelect();
       }}
-      className={`absolute bg-card rounded-xl border shadow-panel transition-shadow ${
-        isDragging ? "shadow-xl ring-2 ring-primary/50 z-50" : ""
-      } ${isSelected ? "ring-2 ring-primary z-40" : ""} ${isResizing ? "select-none" : ""}`}
+      className={cn(
+        "absolute bg-card rounded-xl border shadow-panel transition-all",
+        isDragging && "shadow-xl ring-2 ring-primary/50 z-50",
+        isSelected && "ring-2 ring-primary z-40",
+        isResizing && "select-none",
+        isFieldDragging && "ring-2 ring-dashed ring-muted-foreground/30",
+        showDropIndicator && "ring-2 ring-primary ring-dashed bg-primary/5"
+      )}
     >
       {/* Drag Handle */}
       <div
@@ -126,8 +143,18 @@ export function CanvasVisual({
       )}
 
       {/* Visual Content */}
-      <div className="p-6 h-full">
+      <div className="p-6 h-full relative">
         <VisualPreview type={visual.type} data={visual.data} properties={visual.properties} />
+        
+        {/* Drop indicator overlay */}
+        {showDropIndicator && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div className="bg-primary text-primary-foreground px-3 py-1.5 rounded-full text-sm font-medium flex items-center gap-1.5 shadow-lg">
+              <Plus className="h-4 w-4" />
+              Drop to add field
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Resize Handle */}

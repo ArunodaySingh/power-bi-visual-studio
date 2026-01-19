@@ -8,8 +8,10 @@ import { VisualCanvas } from "@/components/VisualCanvas";
 import { CodeExport } from "@/components/CodeExport";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SheetTabs, type Sheet } from "@/components/SheetTabs";
+import { DataFieldsPanel, metaAdsDataTables, type DataField, type DataTable } from "@/components/DataFieldsPanel";
 import type { CanvasVisualData } from "@/components/CanvasVisual";
-import { createMetaAdsVisuals } from "@/data/metaAdsData";
+import { createMetaAdsVisuals, metaAdsRawData } from "@/data/metaAdsData";
+import { toast } from "sonner";
 
 interface SheetData {
   id: string;
@@ -164,6 +166,46 @@ export default function Index() {
     if (selectedId) handleUpdateVisual(selectedId, { properties });
   };
 
+  // Handle field dropped onto visual
+  const handleFieldDropped = useCallback((visualId: string, field: DataField) => {
+    // Generate new data from the Meta Ads raw data based on the field
+    const newData: DataPoint[] = metaAdsRawData.map((campaign) => {
+      let value = 0;
+      const fieldKey = field.id as keyof typeof campaign;
+      
+      if (fieldKey in campaign) {
+        const rawValue = campaign[fieldKey];
+        value = typeof rawValue === "number" ? rawValue : 0;
+      }
+
+      return {
+        id: crypto.randomUUID(),
+        category: campaign.campaignName.slice(0, 20),
+        value: Math.round(value * 100) / 100,
+      };
+    });
+
+    // Update the visual with new data and title
+    handleUpdateVisual(visualId, {
+      data: newData,
+      properties: {
+        ...visuals.find((v) => v.id === visualId)?.properties!,
+        title: field.name + " by Campaign",
+      },
+    });
+
+    toast.success(`Added "${field.name}" to visual`);
+  }, [handleUpdateVisual, visuals]);
+
+  // Get data tables for current sheet
+  const getCurrentDataTables = (): DataTable[] => {
+    if (activeSheet?.name === "Meta Ads") {
+      return metaAdsDataTables;
+    }
+    // Return empty for other sheets - will add GA and DV360 tables later
+    return [];
+  };
+
   return (
     <div className="h-screen flex flex-col bg-background">
       <Header />
@@ -269,6 +311,7 @@ export default function Index() {
               onDeleteVisual={handleDeleteVisual}
               onDuplicateVisual={handleDuplicateVisual}
               onAddVisual={handleAddVisual}
+              onFieldDropped={handleFieldDropped}
             />
           </div>
 
@@ -282,6 +325,11 @@ export default function Index() {
             onRenameSheet={handleRenameSheet}
           />
         </main>
+
+        {/* Right Sidebar - Data Fields */}
+        <aside className="w-64 border-l bg-card flex flex-col overflow-hidden">
+          <DataFieldsPanel tables={getCurrentDataTables()} />
+        </aside>
       </div>
     </div>
   );
