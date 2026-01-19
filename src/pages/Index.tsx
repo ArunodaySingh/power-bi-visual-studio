@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
-import { Database, Settings, LayoutGrid } from "lucide-react";
+import { Database, Settings, LayoutGrid, Hash, Type } from "lucide-react";
+import { DndContext, DragEndEvent, DragStartEvent, useSensor, useSensors, PointerSensor, DragOverlay } from "@dnd-kit/core";
 import { Header } from "@/components/Header";
 import { VisualTypeSelector, type VisualType } from "@/components/VisualTypeSelector";
 import { PropertyPanel, type VisualProperties } from "@/components/PropertyPanel";
@@ -70,10 +71,21 @@ export default function Index() {
   ]);
   const [activeSheetId, setActiveSheetId] = useState(sheets[0].id);
   const [selectedId, setSelectedId] = useState<string | null>(sheets[0].visuals[0]?.id || null);
+  const [isFieldDragging, setIsFieldDragging] = useState(false);
+  const [draggingField, setDraggingField] = useState<DataField | null>(null);
 
   const activeSheet = sheets.find((s) => s.id === activeSheetId);
   const visuals = activeSheet?.visuals || [];
   const selectedVisual = visuals.find((v) => v.id === selectedId);
+
+  // DnD sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 5,
+      },
+    })
+  );
 
   // Sheet handlers
   const handleSelectSheet = useCallback((id: string) => {
@@ -206,131 +218,195 @@ export default function Index() {
     return [];
   };
 
-  return (
-    <div className="h-screen flex flex-col bg-background">
-      <Header />
-      
-      <div className="flex-1 flex overflow-hidden">
-        {/* Left Sidebar - Configuration */}
-        <aside className="w-72 border-r bg-card flex flex-col overflow-hidden">
-          <Tabs defaultValue="visual" className="flex-1 flex flex-col">
-            <TabsList className="mx-4 mt-4 grid grid-cols-3">
-              <TabsTrigger value="visual" className="gap-1.5 text-xs">
-                <LayoutGrid className="h-3.5 w-3.5" />
-                Visual
-              </TabsTrigger>
-              <TabsTrigger value="data" className="gap-1.5 text-xs">
-                <Database className="h-3.5 w-3.5" />
-                Data
-              </TabsTrigger>
-              <TabsTrigger value="format" className="gap-1.5 text-xs">
-                <Settings className="h-3.5 w-3.5" />
-                Format
-              </TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="visual" className="flex-1 p-4 overflow-y-auto">
-              <div className="space-y-4">
-                {selectedVisual ? (
-                  <>
-                    <div>
-                      <h3 className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wider">
-                        Chart Type
-                      </h3>
-                      <VisualTypeSelector selected={selectedVisual.type} onSelect={handleTypeChange} />
-                    </div>
-                  </>
-                ) : (
-                  <div className="text-sm text-muted-foreground text-center py-8">
-                    Select a visual on the canvas to edit
-                  </div>
-                )}
-              </div>
-            </TabsContent>
-            
-            <TabsContent value="data" className="flex-1 p-4 overflow-y-auto">
-              <div className="space-y-4">
-                {selectedVisual ? (
-                  <>
-                    <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                      Sample Data
-                    </h3>
-                    <DataEditor data={selectedVisual.data} onChange={handleDataChange} />
-                  </>
-                ) : (
-                  <div className="text-sm text-muted-foreground text-center py-8">
-                    Select a visual on the canvas to edit
-                  </div>
-                )}
-              </div>
-            </TabsContent>
-            
-            <TabsContent value="format" className="flex-1 overflow-hidden m-0">
-              {selectedVisual ? (
-                <PropertyPanel properties={selectedVisual.properties} onChange={handlePropertiesChange} />
-              ) : (
-                <div className="text-sm text-muted-foreground text-center py-8 px-4">
-                  Select a visual on the canvas to edit
-                </div>
-              )}
-            </TabsContent>
-          </Tabs>
-        </aside>
+  // Handle drag start for DnD context
+  const handleDragStart = (event: DragStartEvent) => {
+    const { active } = event;
+    const id = active.id as string;
+    
+    if (id.startsWith("field-")) {
+      setIsFieldDragging(true);
+      const fieldData = active.data.current?.field as DataField | undefined;
+      if (fieldData) {
+        setDraggingField(fieldData);
+      }
+    }
+  };
 
-        {/* Main Canvas */}
-        <main className="flex-1 flex flex-col overflow-hidden">
-          {/* Toolbar */}
-          <div className="h-12 border-b bg-card px-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <span className="text-sm text-muted-foreground">Canvas</span>
-              <span className="px-2 py-0.5 bg-accent/10 text-accent text-xs rounded font-medium">
-                {visuals.length} visual{visuals.length !== 1 ? "s" : ""}
-              </span>
-              {selectedVisual && (
-                <span className="px-2 py-0.5 bg-primary/10 text-primary text-xs rounded font-medium">
-                  {selectedVisual.type.charAt(0).toUpperCase() + selectedVisual.type.slice(1)} selected
+  // Handle drag end for DnD context
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over, delta } = event;
+    const activeId = active.id as string;
+    
+    // Reset field dragging state
+    setIsFieldDragging(false);
+    setDraggingField(null);
+
+    // Handle field drop onto visual
+    if (activeId.startsWith("field-") && over) {
+      const overId = over.id as string;
+      if (overId.startsWith("drop-")) {
+        const visualId = overId.replace("drop-", "");
+        const fieldData = active.data.current?.field as DataField | undefined;
+        if (fieldData) {
+          handleFieldDropped(visualId, fieldData);
+        }
+      }
+      return;
+    }
+
+    // Handle visual drag
+    const visual = visuals.find((v) => v.id === activeId);
+    if (visual) {
+      handleUpdateVisual(activeId, {
+        position: {
+          x: visual.position.x + delta.x,
+          y: visual.position.y + delta.y,
+        },
+      });
+    }
+  };
+
+  return (
+    <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+      <div className="h-screen flex flex-col bg-background">
+        <Header />
+        
+        <div className="flex-1 flex overflow-hidden">
+          {/* Left Sidebar - Configuration */}
+          <aside className="w-72 border-r bg-card flex flex-col overflow-hidden">
+            <Tabs defaultValue="visual" className="flex-1 flex flex-col">
+              <TabsList className="mx-4 mt-4 grid grid-cols-3">
+                <TabsTrigger value="visual" className="gap-1.5 text-xs">
+                  <LayoutGrid className="h-3.5 w-3.5" />
+                  Visual
+                </TabsTrigger>
+                <TabsTrigger value="data" className="gap-1.5 text-xs">
+                  <Database className="h-3.5 w-3.5" />
+                  Data
+                </TabsTrigger>
+                <TabsTrigger value="format" className="gap-1.5 text-xs">
+                  <Settings className="h-3.5 w-3.5" />
+                  Format
+                </TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="visual" className="flex-1 p-4 overflow-y-auto">
+                <div className="space-y-4">
+                  {selectedVisual ? (
+                    <>
+                      <div>
+                        <h3 className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wider">
+                          Chart Type
+                        </h3>
+                        <VisualTypeSelector selected={selectedVisual.type} onSelect={handleTypeChange} />
+                      </div>
+                    </>
+                  ) : (
+                    <div className="text-sm text-muted-foreground text-center py-8">
+                      Select a visual on the canvas to edit
+                    </div>
+                  )}
+                </div>
+              </TabsContent>
+              
+              <TabsContent value="data" className="flex-1 p-4 overflow-y-auto">
+                <div className="space-y-4">
+                  {selectedVisual ? (
+                    <>
+                      <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                        Sample Data
+                      </h3>
+                      <DataEditor data={selectedVisual.data} onChange={handleDataChange} />
+                    </>
+                  ) : (
+                    <div className="text-sm text-muted-foreground text-center py-8">
+                      Select a visual on the canvas to edit
+                    </div>
+                  )}
+                </div>
+              </TabsContent>
+              
+              <TabsContent value="format" className="flex-1 overflow-hidden m-0">
+                {selectedVisual ? (
+                  <PropertyPanel properties={selectedVisual.properties} onChange={handlePropertiesChange} />
+                ) : (
+                  <div className="text-sm text-muted-foreground text-center py-8 px-4">
+                    Select a visual on the canvas to edit
+                  </div>
+                )}
+              </TabsContent>
+            </Tabs>
+          </aside>
+
+          {/* Main Canvas */}
+          <main className="flex-1 flex flex-col overflow-hidden">
+            {/* Toolbar */}
+            <div className="h-12 border-b bg-card px-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-muted-foreground">Canvas</span>
+                <span className="px-2 py-0.5 bg-accent/10 text-accent text-xs rounded font-medium">
+                  {visuals.length} visual{visuals.length !== 1 ? "s" : ""}
                 </span>
+                {selectedVisual && (
+                  <span className="px-2 py-0.5 bg-primary/10 text-primary text-xs rounded font-medium">
+                    {selectedVisual.type.charAt(0).toUpperCase() + selectedVisual.type.slice(1)} selected
+                  </span>
+                )}
+              </div>
+              {selectedVisual && (
+                <CodeExport
+                  type={selectedVisual.type}
+                  data={selectedVisual.data}
+                  properties={selectedVisual.properties}
+                />
               )}
             </div>
-            {selectedVisual && (
-              <CodeExport
-                type={selectedVisual.type}
-                data={selectedVisual.data}
-                properties={selectedVisual.properties}
+
+            {/* Canvas Area */}
+            <div className="flex-1 p-4 bg-canvas canvas-grid overflow-auto">
+              <VisualCanvas
+                visuals={visuals}
+                selectedId={selectedId}
+                isFieldDragging={isFieldDragging}
+                onSelectVisual={setSelectedId}
+                onUpdateVisual={handleUpdateVisual}
+                onDeleteVisual={handleDeleteVisual}
+                onDuplicateVisual={handleDuplicateVisual}
+                onAddVisual={handleAddVisual}
               />
-            )}
-          </div>
+            </div>
 
-          {/* Canvas Area */}
-          <div className="flex-1 p-4 bg-canvas canvas-grid overflow-auto">
-            <VisualCanvas
-              visuals={visuals}
-              selectedId={selectedId}
-              onSelectVisual={setSelectedId}
-              onUpdateVisual={handleUpdateVisual}
-              onDeleteVisual={handleDeleteVisual}
-              onDuplicateVisual={handleDuplicateVisual}
-              onAddVisual={handleAddVisual}
-              onFieldDropped={handleFieldDropped}
+            {/* Sheet Tabs at Bottom */}
+            <SheetTabs
+              sheets={sheets.map((s) => ({ id: s.id, name: s.name }))}
+              activeSheetId={activeSheetId}
+              onSelectSheet={handleSelectSheet}
+              onAddSheet={handleAddSheet}
+              onDeleteSheet={handleDeleteSheet}
+              onRenameSheet={handleRenameSheet}
             />
-          </div>
+          </main>
 
-          {/* Sheet Tabs at Bottom */}
-          <SheetTabs
-            sheets={sheets.map((s) => ({ id: s.id, name: s.name }))}
-            activeSheetId={activeSheetId}
-            onSelectSheet={handleSelectSheet}
-            onAddSheet={handleAddSheet}
-            onDeleteSheet={handleDeleteSheet}
-            onRenameSheet={handleRenameSheet}
-          />
-        </main>
-
-        {/* Right Sidebar - Data Fields */}
-        <aside className="w-64 border-l bg-card flex flex-col overflow-hidden">
-          <DataFieldsPanel tables={getCurrentDataTables()} />
-        </aside>
+          {/* Right Sidebar - Data Fields */}
+          <aside className="w-64 border-l bg-card flex flex-col overflow-hidden">
+            <DataFieldsPanel tables={getCurrentDataTables()} />
+          </aside>
+        </div>
       </div>
-    </div>
+
+      {/* Drag Overlay for fields */}
+      <DragOverlay>
+        {draggingField && (
+          <div className="flex items-center gap-2 px-3 py-2 bg-card border rounded-lg shadow-lg text-sm font-medium">
+            {draggingField.type === "metric" ? (
+              <Hash className="h-4 w-4 text-blue-500" />
+            ) : (
+              <Type className="h-4 w-4 text-amber-500" />
+            )}
+            {draggingField.name}
+          </div>
+        )}
+      </DragOverlay>
+    </DndContext>
   );
 }
