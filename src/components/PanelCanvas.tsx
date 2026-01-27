@@ -2,12 +2,12 @@ import { Plus } from "lucide-react";
 import { useDroppable } from "@dnd-kit/core";
 import { DraggablePanel, type PanelData } from "./DraggablePanel";
 import { CanvasVisual, type CanvasVisualData } from "./CanvasVisual";
-import { Button } from "./ui/button";
 import { cn } from "@/lib/utils";
 
 interface PanelCanvasProps {
   panels: PanelData[];
   visuals: CanvasVisualData[];
+  slotVisuals: Map<string, CanvasVisualData>; // slotId -> visual
   selectedPanelId: string | null;
   selectedVisualId: string | null;
   isLayoutDragging?: boolean;
@@ -19,12 +19,13 @@ interface PanelCanvasProps {
   onUpdateVisual: (id: string, updates: Partial<CanvasVisualData>) => void;
   onDeleteVisual: (id: string) => void;
   onDuplicateVisual: (id: string) => void;
-  onAddPanel?: () => void;
+  onRemoveVisualFromSlot: (panelId: string, slotId: string) => void;
 }
 
 export function PanelCanvas({
   panels,
   visuals,
+  slotVisuals,
   selectedPanelId,
   selectedVisualId,
   isLayoutDragging,
@@ -36,7 +37,7 @@ export function PanelCanvas({
   onUpdateVisual,
   onDeleteVisual,
   onDuplicateVisual,
-  onAddPanel,
+  onRemoveVisualFromSlot,
 }: PanelCanvasProps) {
   // Main canvas drop zone for new panels
   const { setNodeRef, isOver } = useDroppable({
@@ -49,8 +50,17 @@ export function PanelCanvas({
     onSelectVisual(null);
   };
 
-  // Get visual by ID for rendering in slots
-  const getVisualById = (id: string) => visuals.find((v) => v.id === id);
+  // Build slot visuals map for each panel
+  const getPanelSlotVisuals = (panel: PanelData): Map<string, CanvasVisualData> => {
+    const map = new Map<string, CanvasVisualData>();
+    panel.slots.forEach((slot) => {
+      const visual = slotVisuals.get(slot.id);
+      if (visual) {
+        map.set(slot.id, visual);
+      }
+    });
+    return map;
+  };
 
   return (
     <div
@@ -68,25 +78,17 @@ export function PanelCanvas({
           key={panel.id}
           panel={panel}
           isSelected={selectedPanelId === panel.id}
+          slotVisuals={getPanelSlotVisuals(panel)}
+          selectedSlotVisualId={selectedVisualId}
           onSelect={() => {
             onSelectPanel(panel.id);
             onSelectVisual(null);
           }}
           onUpdate={(updates) => onUpdatePanel(panel.id, updates)}
           onDelete={() => onDeletePanel(panel.id)}
-          renderSlotContent={(slot) => {
-            if (slot.visualId) {
-              const visual = getVisualById(slot.visualId);
-              if (visual) {
-                // Render a mini preview of the visual
-                return (
-                  <div className="w-full h-full p-2 text-xs text-center flex items-center justify-center">
-                    <span className="text-muted-foreground">{visual.properties.title}</span>
-                  </div>
-                );
-              }
-            }
-            return null;
+          onRemoveVisualFromSlot={(slotId) => onRemoveVisualFromSlot(panel.id, slotId)}
+          onSelectSlotVisual={(visualId) => {
+            onSelectVisual(visualId);
           }}
         />
       ))}

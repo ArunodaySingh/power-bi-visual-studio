@@ -18,11 +18,16 @@ import { metaAdsRawData } from "@/data/metaAdsData";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 
+// Map to store visuals that are placed in panel slots
+// Key: slotId, Value: CanvasVisualData
+type SlotVisualsMap = Map<string, CanvasVisualData>;
+
 interface SheetData {
   id: string;
   name: string;
   panels: PanelData[];
-  visuals: CanvasVisualData[];
+  visuals: CanvasVisualData[]; // Standalone visuals not in panels
+  slotVisuals: SlotVisualsMap; // Visuals placed in panel slots
 }
 
 const createDefaultData = (): DataPoint[] => [
@@ -68,6 +73,7 @@ const createEmptySheet = (name: string): SheetData => ({
   name,
   panels: [],
   visuals: [],
+  slotVisuals: new Map(),
 });
 
 export default function Index() {
@@ -90,7 +96,9 @@ export default function Index() {
   const activeSheet = sheets.find((s) => s.id === activeSheetId);
   const panels = activeSheet?.panels || [];
   const visuals = activeSheet?.visuals || [];
-  const selectedVisual = visuals.find((v) => v.id === selectedVisualId);
+  const slotVisuals = activeSheet?.slotVisuals || new Map<string, CanvasVisualData>();
+  const selectedVisual = visuals.find((v) => v.id === selectedVisualId) || 
+    Array.from(slotVisuals.values()).find((v) => v.id === selectedVisualId);
   const selectedPanel = panels.find((p) => p.id === selectedPanelId);
 
   // DnD sensors
@@ -166,7 +174,105 @@ export default function Index() {
     setSelectedPanelId((prev) => (prev === id ? null : prev));
   }, [activeSheetId]);
 
-  // Visual handlers
+  // Add visual to a panel slot
+  const handleAddVisualToSlot = useCallback((
+    panelId: string, 
+    slotId: string, 
+    type: VisualizationType
+  ) => {
+    const visualType = (type || "bar") as VisualType;
+    const newVisual = createNewVisual(0, visualType);
+    
+    setSheets((prev) =>
+      prev.map((s) => {
+        if (s.id !== activeSheetId) return s;
+        
+        // Add to slotVisuals map
+        const newSlotVisuals = new Map(s.slotVisuals);
+        newSlotVisuals.set(slotId, newVisual);
+        
+        // Update the panel slot to reference this visual
+        const updatedPanels = s.panels.map((p) => {
+          if (p.id !== panelId) return p;
+          return {
+            ...p,
+            slots: p.slots.map((slot) =>
+              slot.id === slotId ? { ...slot, visualId: newVisual.id } : slot
+            ),
+          };
+        });
+        
+        return { ...s, panels: updatedPanels, slotVisuals: newSlotVisuals };
+      })
+    );
+    
+    setSelectedVisualId(newVisual.id);
+    setSelectedPanelId(null);
+    toast.success(`Added ${visualType} chart to panel`);
+  }, [activeSheetId]);
+
+  // Remove visual from a panel slot
+  const handleRemoveVisualFromSlot = useCallback((panelId: string, slotId: string) => {
+    setSheets((prev) =>
+      prev.map((s) => {
+        if (s.id !== activeSheetId) return s;
+        
+        // Remove from slotVisuals map
+        const newSlotVisuals = new Map(s.slotVisuals);
+        const visual = newSlotVisuals.get(slotId);
+        newSlotVisuals.delete(slotId);
+        
+        // Update the panel slot to remove reference
+        const updatedPanels = s.panels.map((p) => {
+          if (p.id !== panelId) return p;
+          return {
+            ...p,
+            slots: p.slots.map((slot) =>
+              slot.id === slotId ? { ...slot, visualId: undefined } : slot
+            ),
+          };
+        });
+        
+        // Clear selection if this visual was selected
+        if (visual && visual.id === selectedVisualId) {
+          setSelectedVisualId(null);
+        }
+        
+        return { ...s, panels: updatedPanels, slotVisuals: newSlotVisuals };
+      })
+    );
+  }, [activeSheetId, selectedVisualId]);
+
+  // Update visual (works for both standalone and slot visuals)
+  const handleUpdateVisual = useCallback((id: string, updates: Partial<CanvasVisualData>) => {
+    setSheets((prev) =>
+      prev.map((s) => {
+        if (s.id !== activeSheetId) return s;
+        
+        // Check if it's a standalone visual
+        const standaloneIndex = s.visuals.findIndex((v) => v.id === id);
+        if (standaloneIndex >= 0) {
+          return {
+            ...s,
+            visuals: s.visuals.map((v) => (v.id === id ? { ...v, ...updates } : v)),
+          };
+        }
+        
+        // Check if it's a slot visual
+        const newSlotVisuals = new Map(s.slotVisuals);
+        for (const [slotId, visual] of newSlotVisuals) {
+          if (visual.id === id) {
+            newSlotVisuals.set(slotId, { ...visual, ...updates });
+            return { ...s, slotVisuals: newSlotVisuals };
+          }
+        }
+        
+        return s;
+      })
+    );
+  }, [activeSheetId]);
+
+  // Visual handlers for standalone visuals
   const handleAddVisual = useCallback((type?: VisualizationType, position?: { x: number; y: number }) => {
     const visualType = (type || "bar") as VisualType;
     const newVisual = createNewVisual(visuals.length, visualType);
@@ -182,16 +288,6 @@ export default function Index() {
     setSelectedPanelId(null);
     toast.success(`Added ${visualType} chart`);
   }, [visuals.length, activeSheetId]);
-
-  const handleUpdateVisual = useCallback((id: string, updates: Partial<CanvasVisualData>) => {
-    setSheets((prev) =>
-      prev.map((s) =>
-        s.id === activeSheetId
-          ? { ...s, visuals: s.visuals.map((v) => (v.id === id ? { ...v, ...updates } : v)) }
-          : s
-      )
-    );
-  }, [activeSheetId]);
 
   const handleDeleteVisual = useCallback((id: string) => {
     setSheets((prev) =>
@@ -321,8 +417,11 @@ export default function Index() {
       if (overId === "canvas-drop" && componentType) {
         handleAddVisual(componentType, { x: 100, y: 100 });
       } else if (overId.startsWith("slot-") && componentType) {
-        // Drop into a panel slot
-        handleAddVisual(componentType, { x: 100, y: 100 });
+        // Drop into a panel slot - use the droppable data
+        const overData = over.data.current;
+        if (overData?.type === "slot" && overData.panelId && overData.slotId) {
+          handleAddVisualToSlot(overData.panelId, overData.slotId, componentType);
+        }
       }
       return;
     }
@@ -415,6 +514,7 @@ export default function Index() {
               <PanelCanvas
                 panels={panels}
                 visuals={visuals}
+                slotVisuals={slotVisuals}
                 selectedPanelId={selectedPanelId}
                 selectedVisualId={selectedVisualId}
                 isLayoutDragging={isLayoutDragging}
@@ -426,6 +526,7 @@ export default function Index() {
                 onUpdateVisual={handleUpdateVisual}
                 onDeleteVisual={handleDeleteVisual}
                 onDuplicateVisual={handleDuplicateVisual}
+                onRemoveVisualFromSlot={handleRemoveVisualFromSlot}
               />
             </div>
 
