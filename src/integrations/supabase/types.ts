@@ -14,7 +14,57 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      meta_ads_campaigns: {
+        Row: {
+          ad_set_name: string
+          campaign_id: string
+          campaign_name: string
+          clicks: number
+          conversions: number
+          cpc: number
+          cpm: number
+          created_at: string
+          ctr: number
+          date: string
+          id: string
+          impressions: number
+          roas: number
+          spend: number
+        }
+        Insert: {
+          ad_set_name: string
+          campaign_id: string
+          campaign_name: string
+          clicks?: number
+          conversions?: number
+          cpc?: number
+          cpm?: number
+          created_at?: string
+          ctr?: number
+          date?: string
+          id?: string
+          impressions?: number
+          roas?: number
+          spend?: number
+        }
+        Update: {
+          ad_set_name?: string
+          campaign_id?: string
+          campaign_name?: string
+          clicks?: number
+          conversions?: number
+          cpc?: number
+          cpm?: number
+          created_at?: string
+          ctr?: number
+          date?: string
+          id?: string
+          impressions?: number
+          roas?: number
+          spend?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

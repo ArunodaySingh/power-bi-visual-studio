@@ -16,12 +16,12 @@ import { type PanelData, generateSlots } from "@/components/DraggablePanel";
 import type { CanvasVisualData } from "@/components/CanvasVisual";
 import type { VisualizationType } from "@/components/VisualizationSelector";
 import type { SlicerType, SlicerData, FieldMapping } from "@/types/dashboard";
-import { metaAdsRawData } from "@/data/metaAdsData";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { FilterProvider, useFilters } from "@/contexts/FilterContext";
 import { CrossFilterProvider, useCrossFilter } from "@/contexts/CrossFilterContext";
 import { DropdownSlicer, ListSlicer, DateRangeSlicer, NumericRangeSlicer } from "@/components/slicers";
+import { useMetaAdsData, getUniqueValues } from "@/hooks/useMetaAdsData";
 
 type SlotVisualsMap = Map<string, CanvasVisualData>;
 
@@ -116,6 +116,7 @@ const getDefaultSlicerField = (type: SlicerType): { field: string; label: string
 function DashboardContent() {
   const { filters, addFilter, removeFilter, getFilteredData } = useFilters();
   const { crossFilter, setCrossFilter, clearCrossFilter } = useCrossFilter();
+  const { data: metaAdsData = [], isLoading: isLoadingMetaAds } = useMetaAdsData();
 
   const [sheets, setSheets] = useState<SheetData[]>([
     createEmptySheet("Meta Ads"),
@@ -423,23 +424,48 @@ function DashboardContent() {
     if (selectedVisualId) handleUpdateVisual(selectedVisualId, { properties });
   };
 
-  // Handle field dropped onto visual
+  // Handle field dropped onto visual - fetch from database
   const handleFieldDropped = useCallback((visualId: string, field: DataField) => {
-    const filteredData = getFilteredData(metaAdsRawData as unknown as Record<string, unknown>[]);
-    const newData: DataPoint[] = filteredData.map((campaign) => {
-      let value = 0;
-      const fieldKey = field.id;
-      if (fieldKey in campaign) {
-        const rawValue = campaign[fieldKey];
-        value = typeof rawValue === "number" ? rawValue : 0;
-      }
-      const campaignName = campaign["campaignName"] as string;
-      return {
-        id: crypto.randomUUID(),
-        category: campaignName ? campaignName.slice(0, 20) : "Unknown",
-        value: Math.round(value * 100) / 100,
-      };
+    if (metaAdsData.length === 0) {
+      toast.error("No data available. Please wait for data to load.");
+      return;
+    }
+
+    // Map database field names to match field IDs
+    const fieldKeyMap: Record<string, string> = {
+      campaign_name: "campaign_name",
+      ad_set_name: "ad_set_name",
+      date: "date",
+      impressions: "impressions",
+      clicks: "clicks",
+      spend: "spend",
+      conversions: "conversions",
+      ctr: "ctr",
+      cpc: "cpc",
+      cpm: "cpm",
+      roas: "roas",
+    };
+
+    const dbFieldKey = fieldKeyMap[field.id] || field.id;
+    
+    // Aggregate data by campaign name
+    const aggregatedData = new Map<string, number>();
+    metaAdsData.forEach((campaign) => {
+      const campaignName = campaign.campaign_name || "Unknown";
+      const rawValue = campaign[dbFieldKey as keyof typeof campaign];
+      const value = typeof rawValue === "number" ? rawValue : 0;
+      
+      aggregatedData.set(
+        campaignName,
+        (aggregatedData.get(campaignName) || 0) + value
+      );
     });
+
+    const newData: DataPoint[] = Array.from(aggregatedData.entries()).map(([category, value]) => ({
+      id: crypto.randomUUID(),
+      category: category.slice(0, 20),
+      value: Math.round(value * 100) / 100,
+    }));
 
     const visual = visuals.find((v) => v.id === visualId) ||
       Array.from(slotVisuals.values()).find((v) => v.id === visualId);
@@ -452,8 +478,8 @@ function DashboardContent() {
       },
     });
 
-    toast.success(`Added "${field.name}" to visual`);
-  }, [handleUpdateVisual, visuals, slotVisuals, getFilteredData]);
+    toast.success(`Loaded "${field.name}" from database (${metaAdsData.length} records)`);
+  }, [handleUpdateVisual, visuals, slotVisuals, metaAdsData]);
 
   // Get data tables for current sheet
   const getCurrentDataTables = (): DataTable[] => {
@@ -463,9 +489,24 @@ function DashboardContent() {
     return [];
   };
 
-  // Get available values for slicer field
+  // Get available values for slicer field from database
   const getSlicerValues = (field: string): (string | number)[] => {
-    return metaAdsRawData.map((item) => item[field as keyof typeof item] as string | number);
+    if (metaAdsData.length === 0) return [];
+    const fieldKeyMap: Record<string, keyof typeof metaAdsData[0]> = {
+      campaignName: "campaign_name",
+      adSetName: "ad_set_name",
+      date: "date",
+      impressions: "impressions",
+      clicks: "clicks",
+      spend: "spend",
+      conversions: "conversions",
+      ctr: "ctr",
+      cpc: "cpc",
+      cpm: "cpm",
+      roas: "roas",
+    };
+    const dbField = fieldKeyMap[field] || field as keyof typeof metaAdsData[0];
+    return getUniqueValues(metaAdsData, dbField);
   };
 
   // Handle cross-filter click from visual
