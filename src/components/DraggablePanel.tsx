@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
-import { Move, X, Maximize2, Plus, GripVertical, Settings } from "lucide-react";
+import { Move, X, Maximize2, Plus, GripVertical, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "./ui/button";
+import { VisualPreview } from "./VisualPreview";
 import type { LayoutType } from "./LayoutPalette";
+import type { CanvasVisualData } from "./CanvasVisual";
 
 export interface PanelData {
   id: string;
@@ -49,11 +51,11 @@ function getGridStyle(layoutType: LayoutType): React.CSSProperties {
     "three-columns": { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px" },
     "two-rows": { display: "grid", gridTemplateRows: "1fr 1fr", gap: "8px" },
     "three-rows": { display: "grid", gridTemplateRows: "1fr 1fr 1fr", gap: "8px" },
-    "left-sidebar": { display: "grid", gridTemplateColumns: "120px 1fr", gap: "8px" },
-    "right-sidebar": { display: "grid", gridTemplateColumns: "1fr 120px", gap: "8px" },
+    "left-sidebar": { display: "grid", gridTemplateColumns: "100px 1fr", gap: "8px" },
+    "right-sidebar": { display: "grid", gridTemplateColumns: "1fr 100px", gap: "8px" },
     "grid-2x2": { display: "grid", gridTemplateColumns: "1fr 1fr", gridTemplateRows: "1fr 1fr", gap: "8px" },
-    "header-content": { display: "grid", gridTemplateRows: "80px 1fr", gap: "8px" },
-    "content-footer": { display: "grid", gridTemplateRows: "1fr 80px", gap: "8px" },
+    "header-content": { display: "grid", gridTemplateRows: "60px 1fr", gap: "8px" },
+    "content-footer": { display: "grid", gridTemplateRows: "1fr 60px", gap: "8px" },
   };
   return styles[layoutType] || styles.single;
 }
@@ -61,31 +63,85 @@ function getGridStyle(layoutType: LayoutType): React.CSSProperties {
 interface PanelSlotDropZoneProps {
   slot: PanelSlot;
   panelId: string;
-  index: number;
-  children?: React.ReactNode;
+  visual?: CanvasVisualData;
+  onRemoveVisual?: () => void;
+  onSelectVisual?: () => void;
+  isSelected?: boolean;
 }
 
-function PanelSlotDropZone({ slot, panelId, index, children }: PanelSlotDropZoneProps) {
+function PanelSlotDropZone({ 
+  slot, 
+  panelId, 
+  visual, 
+  onRemoveVisual,
+  onSelectVisual,
+  isSelected 
+}: PanelSlotDropZoneProps) {
   const { setNodeRef, isOver } = useDroppable({
     id: `slot-${panelId}-${slot.id}`,
     data: { type: "slot", panelId, slotId: slot.id },
   });
 
+  const hasVisual = !!visual;
+
   return (
     <div
       ref={setNodeRef}
+      onClick={(e) => {
+        e.stopPropagation();
+        if (hasVisual && onSelectVisual) {
+          onSelectVisual();
+        }
+      }}
       className={cn(
-        "min-h-[60px] rounded-md border-2 border-dashed transition-all flex items-center justify-center",
+        "relative min-h-[80px] rounded-md border-2 transition-all overflow-hidden",
         isOver 
-          ? "border-primary bg-primary/10" 
-          : "border-muted-foreground/20 bg-muted/30 hover:border-muted-foreground/40",
-        slot.visualId && "border-solid border-border bg-card"
+          ? "border-primary bg-primary/10 border-solid" 
+          : hasVisual 
+            ? "border-border bg-card"
+            : "border-dashed border-muted-foreground/30 bg-muted/20 hover:border-muted-foreground/50",
+        isSelected && hasVisual && "ring-2 ring-primary"
       )}
     >
-      {children || (
-        <div className="text-xs text-muted-foreground flex flex-col items-center gap-1">
-          <Plus className="h-4 w-4" />
-          <span>Drop chart here</span>
+      {hasVisual && visual ? (
+        <div className="w-full h-full relative group">
+          {/* Visual Preview */}
+          <div className="w-full h-full p-2">
+            <VisualPreview
+              type={visual.type}
+              data={visual.data}
+              properties={visual.properties}
+            />
+          </div>
+          
+          {/* Remove button on hover */}
+          <Button
+            size="icon"
+            variant="destructive"
+            className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+            onClick={(e) => {
+              e.stopPropagation();
+              onRemoveVisual?.();
+            }}
+          >
+            <Trash2 className="h-3 w-3" />
+          </Button>
+        </div>
+      ) : (
+        <div className="w-full h-full flex items-center justify-center">
+          <div className="text-xs text-muted-foreground flex flex-col items-center gap-1">
+            <Plus className="h-4 w-4" />
+            <span>Drop chart</span>
+          </div>
+        </div>
+      )}
+
+      {/* Drop indicator overlay */}
+      {isOver && !hasVisual && (
+        <div className="absolute inset-0 bg-primary/20 flex items-center justify-center pointer-events-none">
+          <div className="bg-primary text-primary-foreground px-2 py-1 rounded text-xs font-medium">
+            Release to add
+          </div>
         </div>
       )}
     </div>
@@ -95,19 +151,25 @@ function PanelSlotDropZone({ slot, panelId, index, children }: PanelSlotDropZone
 interface DraggablePanelProps {
   panel: PanelData;
   isSelected: boolean;
+  slotVisuals: Map<string, CanvasVisualData>; // Map of slotId -> visual
+  selectedSlotVisualId?: string | null;
   onSelect: () => void;
   onUpdate: (updates: Partial<PanelData>) => void;
   onDelete: () => void;
-  renderSlotContent?: (slot: PanelSlot) => React.ReactNode;
+  onRemoveVisualFromSlot: (slotId: string) => void;
+  onSelectSlotVisual: (visualId: string) => void;
 }
 
 export function DraggablePanel({
   panel,
   isSelected,
+  slotVisuals,
+  selectedSlotVisualId,
   onSelect,
   onUpdate,
   onDelete,
-  renderSlotContent,
+  onRemoveVisualFromSlot,
+  onSelectSlotVisual,
 }: DraggablePanelProps) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `panel-${panel.id}`,
@@ -159,9 +221,9 @@ export function DraggablePanel({
         onSelect();
       }}
       className={cn(
-        "absolute bg-card/50 backdrop-blur-sm rounded-xl border-2 shadow-sm transition-all",
+        "absolute bg-card/80 backdrop-blur-sm rounded-xl border-2 shadow-sm transition-all",
         isDragging && "shadow-xl ring-2 ring-primary/50 z-50",
-        isSelected ? "border-primary ring-1 ring-primary/20 z-40" : "border-border/50",
+        isSelected ? "border-primary z-40" : "border-border/50",
         isResizing && "select-none"
       )}
     >
@@ -192,16 +254,22 @@ export function DraggablePanel({
 
       {/* Panel Content with Slots */}
       <div className="p-3 h-full" style={getGridStyle(panel.layoutType)}>
-        {panel.slots.map((slot, index) => (
-          <PanelSlotDropZone
-            key={slot.id}
-            slot={slot}
-            panelId={panel.id}
-            index={index}
-          >
-            {renderSlotContent?.(slot)}
-          </PanelSlotDropZone>
-        ))}
+        {panel.slots.map((slot) => {
+          const visual = slotVisuals.get(slot.id);
+          return (
+            <PanelSlotDropZone
+              key={slot.id}
+              slot={slot}
+              panelId={panel.id}
+              visual={visual}
+              isSelected={visual?.id === selectedSlotVisualId}
+              onRemoveVisual={() => onRemoveVisualFromSlot(slot.id)}
+              onSelectVisual={() => {
+                if (visual) onSelectSlotVisual(visual.id);
+              }}
+            />
+          );
+        })}
       </div>
 
       {/* Resize Handle */}
