@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { Settings, LayoutGrid, Hash, Type, Filter } from "lucide-react";
+import { Settings, LayoutGrid, Hash, Type, Filter, Loader2, Database } from "lucide-react";
 import { DndContext, DragEndEvent, DragStartEvent, useSensor, useSensors, PointerSensor, DragOverlay } from "@dnd-kit/core";
 import { VisualTypeSelector, type VisualType } from "@/components/VisualTypeSelector";
 import { PropertyPanel, type VisualProperties } from "@/components/PropertyPanel";
@@ -740,6 +740,17 @@ function DashboardContent() {
                 {filters.length > 0 && (
                   <span className="px-2 py-0.5 bg-destructive/10 text-destructive text-xs rounded font-medium">
                     {filters.length} active
+                  </span>
+                )}
+                {isLoadingMetaAds ? (
+                  <span className="px-2 py-0.5 bg-muted text-muted-foreground text-xs rounded font-medium flex items-center gap-1">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Loading data...
+                  </span>
+                ) : metaAdsData.length > 0 && (
+                  <span className="px-2 py-0.5 bg-primary/10 text-primary text-xs rounded font-medium flex items-center gap-1">
+                    <Database className="h-3 w-3" />
+                    {metaAdsData.length} records
                   </span>
                 )}
               </div>
