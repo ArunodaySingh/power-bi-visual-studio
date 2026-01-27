@@ -85,17 +85,17 @@ export function SlicerBase({
       )}
     >
       {/* Header with Drag Handle */}
-      <div className="flex items-center justify-between px-3 py-2 border-b bg-muted/30 rounded-t-lg">
-        <div className="flex items-center gap-2 flex-1 min-w-0">
+      <div className="flex items-center justify-between px-3 py-2.5 border-b bg-muted/30 rounded-t-lg overflow-hidden">
+        <div className="flex items-center gap-2 flex-1 min-w-0 overflow-hidden">
           <div
             {...listeners}
             {...attributes}
-            className="cursor-grab active:cursor-grabbing p-1 -ml-1 hover:bg-muted rounded"
+            className="cursor-grab active:cursor-grabbing p-1 -ml-1 hover:bg-muted rounded flex-shrink-0"
           >
-            <Move className="h-3.5 w-3.5 text-muted-foreground" />
+            <Move className="h-4 w-4 text-muted-foreground" />
           </div>
-          <Filter className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-          <span className="text-sm font-medium truncate">
+          <Filter className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+          <span className="text-sm font-medium truncate flex-1 min-w-0">
             {slicer.title || slicer.fieldLabel}
           </span>
           {hasSelection && (
@@ -136,7 +136,7 @@ export function SlicerBase({
       </div>
 
       {/* Slicer Content */}
-      <div className="p-2">{children}</div>
+      <div className="p-3 overflow-hidden">{children}</div>
 
       {/* Resize Handle */}
       <div

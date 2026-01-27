@@ -39,19 +39,19 @@ function DraggableField({ field }: DraggableFieldProps) {
       {...listeners}
       {...attributes}
       className={cn(
-        "flex items-center gap-2 px-2 py-1.5 rounded-md cursor-grab text-sm",
+        "flex items-center gap-2 px-3 py-2 rounded-md cursor-grab text-sm",
         "hover:bg-secondary/80 transition-colors group",
         isDragging && "opacity-50 bg-primary/10 ring-1 ring-primary"
       )}
     >
-      <GripVertical className="h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+      <GripVertical className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
       {field.type === "metric" ? (
-        <Hash className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+        <Hash className="h-4 w-4 text-accent flex-shrink-0" />
       ) : (
-        <Type className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+        <Type className="h-4 w-4 text-primary flex-shrink-0" />
       )}
-      <span className="truncate">{field.name}</span>
-      <span className="ml-auto text-[10px] text-muted-foreground uppercase">
+      <span className="truncate flex-1 min-w-0">{field.name}</span>
+      <span className="ml-auto text-xs text-muted-foreground uppercase flex-shrink-0">
         {field.type === "metric" ? "Σ" : "A"}
       </span>
     </div>
@@ -86,13 +86,13 @@ function TableSection({ table, defaultOpen = true }: TableSectionProps) {
         </span>
       </button>
       {isOpen && (
-        <div className="px-2 pb-2 space-y-2">
+        <div className="px-3 pb-3 space-y-3">
           {dimensions.length > 0 && (
             <div>
-              <div className="px-2 py-1 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+              <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 Dimensions
               </div>
-              <div className="space-y-0.5">
+              <div className="space-y-1">
                 {dimensions.map((field) => (
                   <DraggableField key={field.id} field={field} />
                 ))}
@@ -101,10 +101,10 @@ function TableSection({ table, defaultOpen = true }: TableSectionProps) {
           )}
           {metrics.length > 0 && (
             <div>
-              <div className="px-2 py-1 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+              <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">
                 Metrics
               </div>
-              <div className="space-y-0.5">
+              <div className="space-y-1">
                 {metrics.map((field) => (
                   <DraggableField key={field.id} field={field} />
                 ))}
@@ -124,11 +124,11 @@ interface DataFieldsPanelProps {
 export function DataFieldsPanel({ tables }: DataFieldsPanelProps) {
   return (
     <div className="h-full flex flex-col overflow-hidden">
-      <div className="px-3 py-3 border-b bg-secondary/30">
-        <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+      <div className="px-4 py-3 border-b bg-secondary/30">
+        <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
           Data Fields
         </h3>
-        <p className="text-[10px] text-muted-foreground mt-0.5">
+        <p className="text-xs text-muted-foreground mt-1">
           Drag fields to visuals
         </p>
       </div>

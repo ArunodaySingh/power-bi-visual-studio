@@ -83,14 +83,14 @@ function DraggableComponentItem({ component }: DraggableComponentItemProps) {
       {...listeners}
       {...attributes}
       className={cn(
-        "flex flex-col items-center gap-2 p-3 rounded-lg border-2 border-transparent",
+        "flex flex-col items-center justify-center gap-2 p-3 rounded-lg border-2 border-transparent min-h-[72px]",
         "bg-muted/50 hover:bg-muted hover:border-border transition-all",
-        "cursor-grab active:cursor-grabbing group",
+        "cursor-grab active:cursor-grabbing group overflow-hidden",
         isDragging && "opacity-50 ring-2 ring-primary"
       )}
     >
-      <component.icon className="h-6 w-6 text-muted-foreground group-hover:text-foreground transition-colors" />
-      <span className="text-xs font-medium text-muted-foreground group-hover:text-foreground transition-colors text-center">
+      <component.icon className="h-6 w-6 text-muted-foreground group-hover:text-foreground transition-colors flex-shrink-0" />
+      <span className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition-colors text-center truncate w-full">
         {component.label}
       </span>
     </div>
@@ -118,14 +118,14 @@ function DraggableSlicerItem({ slicer }: DraggableSlicerItemProps) {
       {...listeners}
       {...attributes}
       className={cn(
-        "flex flex-col items-center gap-2 p-3 rounded-lg border-2 border-transparent",
+        "flex flex-col items-center justify-center gap-2 p-3 rounded-lg border-2 border-transparent min-h-[72px]",
         "bg-accent/30 hover:bg-accent/50 hover:border-accent transition-all",
-        "cursor-grab active:cursor-grabbing group",
+        "cursor-grab active:cursor-grabbing group overflow-hidden",
         isDragging && "opacity-50 ring-2 ring-accent"
       )}
     >
-      <slicer.icon className="h-5 w-5 text-accent-foreground/70 group-hover:text-accent-foreground transition-colors" />
-      <span className="text-xs font-medium text-accent-foreground/70 group-hover:text-accent-foreground transition-colors text-center">
+      <slicer.icon className="h-5 w-5 text-accent-foreground/70 group-hover:text-accent-foreground transition-colors flex-shrink-0" />
+      <span className="text-sm font-medium text-accent-foreground/70 group-hover:text-accent-foreground transition-colors text-center truncate w-full">
         {slicer.label}
       </span>
     </div>
@@ -145,14 +145,14 @@ export function ComponentPalette({ onAddVisual, onAddLayout, onAddSlicer }: Comp
   const advanced = componentOptions.filter((c) => c.category === "advanced");
 
   const renderSection = (title: string, items: ComponentOption[], description?: string) => (
-    <div className="space-y-2">
-      <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider px-1">
+    <div className="space-y-3">
+      <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider px-1">
         {title}
       </h3>
       {description && (
-        <p className="text-xs text-muted-foreground px-1 mb-2">{description}</p>
+        <p className="text-sm text-muted-foreground px-1 mb-2">{description}</p>
       )}
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-2 gap-2.5">
         {items.map((item) => (
           <DraggableComponentItem key={item.type} component={item} />
         ))}
@@ -161,13 +161,13 @@ export function ComponentPalette({ onAddVisual, onAddLayout, onAddSlicer }: Comp
   );
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="p-4 border-b">
-        <h2 className="font-semibold text-sm flex items-center gap-2">
-          <LayoutGrid className="h-4 w-4" />
+    <div className="flex flex-col h-full overflow-hidden">
+      <div className="p-4 border-b flex-shrink-0">
+        <h2 className="font-semibold text-base flex items-center gap-2">
+          <LayoutGrid className="h-5 w-5" />
           Build Dashboard
         </h2>
-        <p className="text-xs text-muted-foreground mt-1">
+        <p className="text-sm text-muted-foreground mt-1">
           Drag items to canvas
         </p>
       </div>
@@ -179,14 +179,14 @@ export function ComponentPalette({ onAddVisual, onAddLayout, onAddSlicer }: Comp
           
           {/* Slicers Section */}
           <div className="border-t pt-4">
-            <div className="space-y-2">
-              <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider px-1">
+            <div className="space-y-3">
+              <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider px-1">
                 Filters / Slicers
               </h3>
-              <p className="text-xs text-muted-foreground px-1 mb-2">
+              <p className="text-sm text-muted-foreground px-1 mb-2">
                 Interactive filters for data
               </p>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-2.5">
                 {slicerOptions.map((slicer) => (
                   <DraggableSlicerItem key={slicer.type} slicer={slicer} />
                 ))}

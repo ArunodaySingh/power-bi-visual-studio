@@ -34,25 +34,25 @@ function FieldWell({
   });
 
   return (
-    <div className="space-y-1.5">
-      <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+    <div className="space-y-2">
+      <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider block">
         {label}
       </label>
       <div
         ref={setNodeRef}
         className={cn(
-          "min-h-[40px] rounded-lg border-2 border-dashed p-2 transition-all",
+          "min-h-[44px] rounded-lg border-2 border-dashed p-2.5 transition-all overflow-hidden",
           isOver && "border-primary bg-primary/5",
           fields.length === 0 && "border-border/50",
           fields.length > 0 && "border-transparent bg-muted/30"
         )}
       >
         {fields.length === 0 ? (
-          <div className="text-xs text-muted-foreground text-center py-1">
+          <div className="text-sm text-muted-foreground text-center py-1.5">
             Drop field here
           </div>
         ) : (
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap gap-2">
             {fields.map((field) => (
               <FieldChip
                 key={field.id}
@@ -103,28 +103,28 @@ function FieldChip({
   return (
     <div
       className={cn(
-        "inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium",
+        "inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium max-w-full",
         field.type === "metric"
           ? "bg-primary/10 text-primary border border-primary/20"
           : "bg-secondary text-secondary-foreground border border-border"
       )}
     >
-      <GripVertical className="h-3 w-3 opacity-40" />
+      <GripVertical className="h-3.5 w-3.5 opacity-40 flex-shrink-0" />
       {field.type === "metric" ? (
-        <Hash className="h-3 w-3" />
+        <Hash className="h-3.5 w-3.5 flex-shrink-0" />
       ) : (
-        <Type className="h-3 w-3" />
+        <Type className="h-3.5 w-3.5 flex-shrink-0" />
       )}
-      <span className="max-w-[80px] truncate">{field.name}</span>
+      <span className="truncate flex-1 min-w-0 max-w-[100px]">{field.name}</span>
       
       {showAggregation && field.type === "metric" && (
         <Select value={aggregation} onValueChange={handleAggregationChange}>
-          <SelectTrigger className="h-5 w-8 px-1 text-[10px] border-0 bg-transparent">
+          <SelectTrigger className="h-6 w-10 px-1.5 text-xs border-0 bg-transparent flex-shrink-0">
             <SelectValue>
               <span className="font-mono">{aggregationLabels[aggregation]}</span>
             </SelectValue>
           </SelectTrigger>
-          <SelectContent className="min-w-[100px] bg-popover z-50">
+          <SelectContent className="min-w-[120px] bg-popover z-50">
             <SelectItem value="sum">Sum (Σ)</SelectItem>
             <SelectItem value="avg">Average (μ)</SelectItem>
             <SelectItem value="count">Count (#)</SelectItem>
@@ -137,9 +137,9 @@ function FieldChip({
       
       <button
         onClick={onRemove}
-        className="ml-0.5 p-0.5 hover:bg-foreground/10 rounded transition-colors"
+        className="ml-1 p-0.5 hover:bg-foreground/10 rounded transition-colors flex-shrink-0"
       >
-        <X className="h-3 w-3" />
+        <X className="h-3.5 w-3.5" />
       </button>
     </div>
   );
@@ -179,10 +179,10 @@ export function FieldWells({ fieldMapping, onFieldMappingChange }: FieldWellsPro
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-2 pb-2 border-b">
-        <Sigma className="h-4 w-4 text-muted-foreground" />
-        <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+    <div className="space-y-4 overflow-hidden">
+      <div className="flex items-center gap-2 pb-3 border-b">
+        <Sigma className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+        <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
           Field Wells
         </h3>
       </div>

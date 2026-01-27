@@ -94,7 +94,7 @@ function PanelSlotDropZone({
         }
       }}
       className={cn(
-        "relative min-h-[80px] rounded-md border-2 transition-all overflow-hidden",
+        "relative min-h-[100px] rounded-lg border-2 transition-all overflow-hidden flex flex-col",
         isOver 
           ? "border-primary bg-primary/10 border-solid" 
           : hasVisual 
@@ -104,9 +104,9 @@ function PanelSlotDropZone({
       )}
     >
       {hasVisual && visual ? (
-        <div className="w-full h-full relative group">
+        <div className="w-full h-full flex-1 relative group min-h-0 overflow-hidden">
           {/* Visual Preview */}
-          <div className="w-full h-full p-2">
+          <div className="w-full h-full p-3 overflow-hidden">
             <VisualPreview
               type={visual.type}
               data={visual.data}
@@ -118,19 +118,19 @@ function PanelSlotDropZone({
           <Button
             size="icon"
             variant="destructive"
-            className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+            className="absolute top-2 right-2 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
             onClick={(e) => {
               e.stopPropagation();
               onRemoveVisual?.();
             }}
           >
-            <Trash2 className="h-3 w-3" />
+            <Trash2 className="h-3.5 w-3.5" />
           </Button>
         </div>
       ) : (
-        <div className="w-full h-full flex items-center justify-center">
-          <div className="text-xs text-muted-foreground flex flex-col items-center gap-1">
-            <Plus className="h-4 w-4" />
+        <div className="w-full h-full flex-1 flex items-center justify-center p-4">
+          <div className="text-sm text-muted-foreground flex flex-col items-center gap-2">
+            <Plus className="h-5 w-5" />
             <span>Drop chart</span>
           </div>
         </div>
@@ -139,7 +139,7 @@ function PanelSlotDropZone({
       {/* Drop indicator overlay */}
       {isOver && !hasVisual && (
         <div className="absolute inset-0 bg-primary/20 flex items-center justify-center pointer-events-none">
-          <div className="bg-primary text-primary-foreground px-2 py-1 rounded text-xs font-medium">
+          <div className="bg-primary text-primary-foreground px-3 py-1.5 rounded-md text-sm font-medium">
             Release to add
           </div>
         </div>
@@ -253,7 +253,7 @@ export function DraggablePanel({
       )}
 
       {/* Panel Content with Slots */}
-      <div className="p-3 h-full" style={getGridStyle(panel.layoutType)}>
+      <div className="p-4 h-full overflow-hidden" style={getGridStyle(panel.layoutType)}>
         {panel.slots.map((slot) => {
           const visual = slotVisuals.get(slot.id);
           return (
