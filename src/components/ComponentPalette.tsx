@@ -1,4 +1,22 @@
-import { BarChart3, LineChart, PieChart, Table2, Gauge, TrendingUp, LayoutGrid, CreditCard, Grid3X3, Filter, ListFilter, Calendar, SlidersHorizontal } from "lucide-react";
+import { 
+  BarChart3, 
+  LineChart, 
+  PieChart, 
+  Table2, 
+  Gauge, 
+  TrendingUp, 
+  LayoutGrid, 
+  CreditCard, 
+  Grid3X3, 
+  Filter, 
+  ListFilter, 
+  Calendar, 
+  SlidersHorizontal,
+  GitBranch,
+  Triangle,
+  CircleDot,
+  Layers
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "./ui/scroll-area";
 import { LayoutPalette } from "./LayoutPalette";
@@ -12,7 +30,7 @@ interface ComponentOption {
   type: VisualizationType;
   icon: React.ElementType;
   label: string;
-  category: "charts" | "tables" | "cards";
+  category: "charts" | "tables" | "cards" | "advanced";
 }
 
 interface SlicerOption {
@@ -27,9 +45,14 @@ const componentOptions: ComponentOption[] = [
   { type: "pie", icon: PieChart, label: "Pie Chart", category: "charts" },
   { type: "area", icon: TrendingUp, label: "Area Chart", category: "charts" },
   { type: "gauge", icon: Gauge, label: "Gauge", category: "charts" },
+  { type: "combo" as VisualizationType, icon: TrendingUp, label: "Combo", category: "charts" },
   { type: "matrix", icon: Grid3X3, label: "Matrix", category: "tables" },
   { type: "table", icon: Table2, label: "Table", category: "tables" },
   { type: "card" as VisualizationType, icon: CreditCard, label: "KPI Card", category: "cards" },
+  { type: "waterfall" as VisualizationType, icon: GitBranch, label: "Waterfall", category: "advanced" },
+  { type: "treemap" as VisualizationType, icon: Layers, label: "Treemap", category: "advanced" },
+  { type: "funnel" as VisualizationType, icon: Triangle, label: "Funnel", category: "advanced" },
+  { type: "scatter" as VisualizationType, icon: CircleDot, label: "Scatter", category: "advanced" },
 ];
 
 const slicerOptions: SlicerOption[] = [
@@ -119,6 +142,7 @@ export function ComponentPalette({ onAddVisual, onAddLayout, onAddSlicer }: Comp
   const charts = componentOptions.filter((c) => c.category === "charts");
   const tables = componentOptions.filter((c) => c.category === "tables");
   const cards = componentOptions.filter((c) => c.category === "cards");
+  const advanced = componentOptions.filter((c) => c.category === "advanced");
 
   const renderSection = (title: string, items: ComponentOption[], description?: string) => (
     <div className="space-y-2">
@@ -175,6 +199,7 @@ export function ComponentPalette({ onAddVisual, onAddLayout, onAddSlicer }: Comp
           </div>
           {renderSection("Tables", tables)}
           {renderSection("Cards", cards)}
+          {renderSection("Advanced Charts", advanced)}
         </div>
       </ScrollArea>
     </div>

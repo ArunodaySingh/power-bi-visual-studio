@@ -34,6 +34,7 @@ export interface DataField {
   name: string;
   type: "metric" | "dimension";
   format?: string;
+  aggregation?: AggregationType;
 }
 
 export interface FieldMapping {
@@ -54,7 +55,11 @@ export interface ConditionalRule {
 export interface RuleCondition {
   operator: "gt" | "lt" | "gte" | "lte" | "eq" | "between";
   value: number;
-  value2?: number; // For "between" operator
+  value2?: number;
   color?: string;
   icon?: string;
+}
+
+export interface VisualPropertiesExtended {
+  conditionalFormatting?: ConditionalRule[];
 }

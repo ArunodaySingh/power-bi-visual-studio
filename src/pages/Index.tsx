@@ -10,15 +10,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SheetTabs } from "@/components/SheetTabs";
 import { DataFieldsPanel, metaAdsDataTables, type DataField, type DataTable } from "@/components/DataFieldsPanel";
 import { ComponentPalette } from "@/components/ComponentPalette";
+import { FieldWells } from "@/components/FieldWells";
 import { type LayoutType } from "@/components/LayoutPalette";
 import { type PanelData, generateSlots } from "@/components/DraggablePanel";
 import type { CanvasVisualData } from "@/components/CanvasVisual";
 import type { VisualizationType } from "@/components/VisualizationSelector";
-import type { SlicerType, SlicerData } from "@/types/dashboard";
+import type { SlicerType, SlicerData, FieldMapping } from "@/types/dashboard";
 import { metaAdsRawData } from "@/data/metaAdsData";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { FilterProvider, useFilters } from "@/contexts/FilterContext";
+import { CrossFilterProvider, useCrossFilter } from "@/contexts/CrossFilterContext";
 import { DropdownSlicer, ListSlicer, DateRangeSlicer, NumericRangeSlicer } from "@/components/slicers";
 
 type SlotVisualsMap = Map<string, CanvasVisualData>;
@@ -60,6 +62,11 @@ const createNewVisual = (index: number, type: VisualType = "bar"): CanvasVisualD
   },
   position: { x: 50 + (index % 3) * 350, y: 50 + Math.floor(index / 3) * 280 },
   size: { width: 400, height: 300 },
+  fieldMapping: {
+    axis: [],
+    values: [],
+    tooltips: [],
+  },
 });
 
 const createNewPanel = (layoutType: LayoutType, index: number): PanelData => ({
@@ -108,6 +115,7 @@ const getDefaultSlicerField = (type: SlicerType): { field: string; label: string
 
 function DashboardContent() {
   const { filters, addFilter, removeFilter, getFilteredData } = useFilters();
+  const { crossFilter, setCrossFilter, clearCrossFilter } = useCrossFilter();
 
   const [sheets, setSheets] = useState<SheetData[]>([
     createEmptySheet("Meta Ads"),
@@ -459,6 +467,22 @@ function DashboardContent() {
     return metaAdsRawData.map((item) => item[field as keyof typeof item] as string | number);
   };
 
+  // Handle cross-filter click from visual
+  const handleVisualDataClick = useCallback((visualId: string, dimension: string, value: string) => {
+    setCrossFilter({
+      sourceVisualId: visualId,
+      dimension,
+      value,
+    });
+  }, [setCrossFilter]);
+
+  // Handle field mapping change for selected visual
+  const handleFieldMappingChange = useCallback((mapping: FieldMapping) => {
+    if (selectedVisualId) {
+      handleUpdateVisual(selectedVisualId, { fieldMapping: mapping });
+    }
+  }, [selectedVisualId, handleUpdateVisual]);
+
   // Handle drag start
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event;
@@ -726,6 +750,8 @@ function DashboardContent() {
                 selectedVisualId={selectedVisualId}
                 isLayoutDragging={isLayoutDragging || isSlicerDragging}
                 isFieldDragging={isFieldDragging}
+                crossFilterVisualId={crossFilter?.sourceVisualId || null}
+                highlightedValue={crossFilter?.value || null}
                 onSelectPanel={setSelectedPanelId}
                 onSelectVisual={setSelectedVisualId}
                 onUpdatePanel={handleUpdatePanel}
@@ -734,6 +760,7 @@ function DashboardContent() {
                 onDeleteVisual={handleDeleteVisual}
                 onDuplicateVisual={handleDuplicateVisual}
                 onRemoveVisualFromSlot={handleRemoveVisualFromSlot}
+                onDataClick={handleVisualDataClick}
               />
             </div>
 
@@ -781,7 +808,13 @@ function DashboardContent() {
                           </h3>
                           <VisualTypeSelector selected={selectedVisual.type} onSelect={handleTypeChange} />
                         </div>
-                        <div>
+                        <div className="border-t pt-4">
+                          <FieldWells
+                            fieldMapping={selectedVisual.fieldMapping || { axis: [], values: [], tooltips: [] }}
+                            onFieldMappingChange={handleFieldMappingChange}
+                          />
+                        </div>
+                        <div className="border-t pt-4">
                           <h3 className="text-xs font-medium text-muted-foreground mb-3 uppercase tracking-wider">
                             Data
                           </h3>
@@ -883,7 +916,9 @@ function DashboardContent() {
 export default function Index() {
   return (
     <FilterProvider>
-      <DashboardContent />
+      <CrossFilterProvider>
+        <DashboardContent />
+      </CrossFilterProvider>
     </FilterProvider>
   );
 }

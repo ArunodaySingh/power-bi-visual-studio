@@ -1,7 +1,31 @@
-import { BarChart3, LineChart, PieChart, Gauge, TrendingUp, Grid3X3 } from "lucide-react";
+import { 
+  BarChart3, 
+  LineChart, 
+  PieChart, 
+  Gauge, 
+  TrendingUp, 
+  Grid3X3,
+  GitBranch,
+  Triangle,
+  CircleDot,
+  Layers,
+  CreditCard
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export type VisualType = "bar" | "line" | "pie" | "gauge" | "area" | "matrix";
+export type VisualType = 
+  | "bar" 
+  | "line" 
+  | "pie" 
+  | "gauge" 
+  | "area" 
+  | "matrix"
+  | "waterfall"
+  | "treemap"
+  | "funnel"
+  | "scatter"
+  | "combo"
+  | "card";
 
 interface VisualTypeSelectorProps {
   selected: VisualType;
@@ -15,6 +39,12 @@ const visualTypes: { type: VisualType; icon: React.ElementType; label: string }[
   { type: "gauge", icon: Gauge, label: "Gauge" },
   { type: "area", icon: TrendingUp, label: "Area Chart" },
   { type: "matrix", icon: Grid3X3, label: "Matrix" },
+  { type: "waterfall", icon: GitBranch, label: "Waterfall" },
+  { type: "treemap", icon: Layers, label: "Treemap" },
+  { type: "funnel", icon: Triangle, label: "Funnel" },
+  { type: "scatter", icon: CircleDot, label: "Scatter" },
+  { type: "combo", icon: TrendingUp, label: "Combo" },
+  { type: "card", icon: CreditCard, label: "KPI Card" },
 ];
 
 export function VisualTypeSelector({ selected, onSelect }: VisualTypeSelectorProps) {

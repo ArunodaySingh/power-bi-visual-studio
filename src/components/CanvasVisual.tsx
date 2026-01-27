@@ -8,6 +8,8 @@ import type { VisualProperties } from "./PropertyPanel";
 import type { DataPoint } from "./DataEditor";
 import { Button } from "./ui/button";
 import { cn } from "@/lib/utils";
+import type { FieldMapping } from "@/types/dashboard";
+
 export interface CanvasVisualData {
   id: string;
   type: VisualType;
@@ -15,26 +17,33 @@ export interface CanvasVisualData {
   properties: VisualProperties;
   position: { x: number; y: number };
   size: { width: number; height: number };
+  fieldMapping?: FieldMapping;
 }
 
 interface CanvasVisualProps {
   visual: CanvasVisualData;
   isSelected: boolean;
   isFieldDragging?: boolean;
+  isCrossFiltered?: boolean;
+  highlightedValue?: string | string[] | null;
   onSelect: () => void;
   onUpdate: (updates: Partial<CanvasVisualData>) => void;
   onDelete: () => void;
   onDuplicate: () => void;
+  onDataClick?: (dimension: string, value: string) => void;
 }
 
 export function CanvasVisual({
   visual,
   isSelected,
   isFieldDragging,
+  isCrossFiltered,
+  highlightedValue,
   onSelect,
   onUpdate,
   onDelete,
   onDuplicate,
+  onDataClick,
 }: CanvasVisualProps) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: visual.id,
@@ -101,7 +110,8 @@ export function CanvasVisual({
         isSelected && "ring-2 ring-primary z-40",
         isResizing && "select-none",
         isFieldDragging && "ring-2 ring-dashed ring-muted-foreground/30",
-        showDropIndicator && "ring-2 ring-primary ring-dashed bg-primary/5"
+        showDropIndicator && "ring-2 ring-primary ring-dashed bg-primary/5",
+        isCrossFiltered && "ring-2 ring-accent"
       )}
     >
       {/* Drag Handle */}
@@ -144,7 +154,13 @@ export function CanvasVisual({
 
       {/* Visual Content */}
       <div className="p-6 h-full relative">
-        <VisualPreview type={visual.type} data={visual.data} properties={visual.properties} />
+        <VisualPreview 
+          type={visual.type} 
+          data={visual.data} 
+          properties={visual.properties}
+          onDataClick={onDataClick}
+          highlightedValue={highlightedValue}
+        />
         
         {/* Drop indicator overlay */}
         {showDropIndicator && (

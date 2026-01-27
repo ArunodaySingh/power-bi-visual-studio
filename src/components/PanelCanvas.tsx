@@ -7,11 +7,13 @@ import { cn } from "@/lib/utils";
 interface PanelCanvasProps {
   panels: PanelData[];
   visuals: CanvasVisualData[];
-  slotVisuals: Map<string, CanvasVisualData>; // slotId -> visual
+  slotVisuals: Map<string, CanvasVisualData>;
   selectedPanelId: string | null;
   selectedVisualId: string | null;
   isLayoutDragging?: boolean;
   isFieldDragging?: boolean;
+  crossFilterVisualId?: string | null;
+  highlightedValue?: string | string[] | null;
   onSelectPanel: (id: string | null) => void;
   onSelectVisual: (id: string | null) => void;
   onUpdatePanel: (id: string, updates: Partial<PanelData>) => void;
@@ -20,6 +22,7 @@ interface PanelCanvasProps {
   onDeleteVisual: (id: string) => void;
   onDuplicateVisual: (id: string) => void;
   onRemoveVisualFromSlot: (panelId: string, slotId: string) => void;
+  onDataClick?: (visualId: string, dimension: string, value: string) => void;
 }
 
 export function PanelCanvas({
@@ -30,6 +33,8 @@ export function PanelCanvas({
   selectedVisualId,
   isLayoutDragging,
   isFieldDragging,
+  crossFilterVisualId,
+  highlightedValue,
   onSelectPanel,
   onSelectVisual,
   onUpdatePanel,
@@ -38,6 +43,7 @@ export function PanelCanvas({
   onDeleteVisual,
   onDuplicateVisual,
   onRemoveVisualFromSlot,
+  onDataClick,
 }: PanelCanvasProps) {
   // Main canvas drop zone for new panels
   const { setNodeRef, isOver } = useDroppable({
@@ -100,6 +106,8 @@ export function PanelCanvas({
           visual={visual}
           isSelected={selectedVisualId === visual.id}
           isFieldDragging={isFieldDragging}
+          isCrossFiltered={crossFilterVisualId !== null && crossFilterVisualId !== visual.id}
+          highlightedValue={crossFilterVisualId === visual.id ? null : highlightedValue}
           onSelect={() => {
             onSelectVisual(visual.id);
             onSelectPanel(null);
@@ -107,6 +115,7 @@ export function PanelCanvas({
           onUpdate={(updates) => onUpdateVisual(visual.id, updates)}
           onDelete={() => onDeleteVisual(visual.id)}
           onDuplicate={() => onDuplicateVisual(visual.id)}
+          onDataClick={onDataClick ? (dimension, value) => onDataClick(visual.id, dimension, value) : undefined}
         />
       ))}
 

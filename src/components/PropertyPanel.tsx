@@ -5,6 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
+import { ConditionalFormatting } from "@/components/formatting";
+import type { ConditionalRule } from "@/types/dashboard";
 
 export interface VisualProperties {
   title: string;
@@ -16,6 +18,7 @@ export interface VisualProperties {
   fontSize: number;
   borderRadius: number;
   animationDuration: number;
+  conditionalFormatting?: ConditionalRule[];
 }
 
 interface PropertyPanelProps {
@@ -52,7 +55,13 @@ function Section({ title, icon: Icon, children, defaultOpen = true }: SectionPro
   );
 }
 
-export function PropertyPanel({ properties, onChange }: PropertyPanelProps) {
+interface PropertyPanelProps {
+  properties: VisualProperties;
+  onChange: (props: VisualProperties) => void;
+  availableFields?: string[];
+}
+
+export function PropertyPanel({ properties, onChange, availableFields = [] }: PropertyPanelProps) {
   const updateProperty = <K extends keyof VisualProperties>(
     key: K,
     value: VisualProperties[K]
@@ -201,6 +210,14 @@ export function PropertyPanel({ properties, onChange }: PropertyPanelProps) {
             />
           </div>
         </div>
+      </Section>
+
+      <Section title="Conditional Formatting" icon={Palette} defaultOpen={false}>
+        <ConditionalFormatting
+          rules={properties.conditionalFormatting || []}
+          availableFields={availableFields.length > 0 ? availableFields : ["value"]}
+          onChange={(rules) => updateProperty("conditionalFormatting", rules)}
+        />
       </Section>
     </div>
   );
