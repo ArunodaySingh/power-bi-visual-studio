@@ -1,23 +1,29 @@
 import { useState } from "react";
-import { ChevronDown, ChevronRight, Palette, Type, Layout, Sliders } from "lucide-react";
+import { ChevronDown, ChevronRight, Palette, Type, Layout, Sliders, BarChart3 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { ConditionalFormatting } from "@/components/formatting";
 import type { ConditionalRule } from "@/types/dashboard";
+
+export type LegendPosition = "top" | "bottom" | "left" | "right";
+export type BarChartMode = "grouped" | "stacked";
 
 export interface VisualProperties {
   title: string;
   showTitle: boolean;
   showLegend: boolean;
+  legendPosition: LegendPosition;
   showDataLabels: boolean;
   primaryColor: string;
   backgroundColor: string;
   fontSize: number;
   borderRadius: number;
   animationDuration: number;
+  barChartMode: BarChartMode;
   conditionalFormatting?: ConditionalRule[];
 }
 
@@ -104,6 +110,33 @@ export function PropertyPanel({ properties, onChange, availableFields = [] }: Pr
               onCheckedChange={(checked) => updateProperty("showLegend", checked)}
             />
           </div>
+          {properties.showLegend && (
+            <div className="space-y-1.5 pl-2 border-l-2 border-border">
+              <Label className="text-xs text-muted-foreground">Legend Position</Label>
+              <RadioGroup
+                value={properties.legendPosition || "bottom"}
+                onValueChange={(value) => updateProperty("legendPosition", value as "top" | "bottom" | "left" | "right")}
+                className="grid grid-cols-2 gap-2"
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="top" id="legend-top" />
+                  <Label htmlFor="legend-top" className="text-xs">Top</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="bottom" id="legend-bottom" />
+                  <Label htmlFor="legend-bottom" className="text-xs">Bottom</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="left" id="legend-left" />
+                  <Label htmlFor="legend-left" className="text-xs">Left</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="right" id="legend-right" />
+                  <Label htmlFor="legend-right" className="text-xs">Right</Label>
+                </div>
+              </RadioGroup>
+            </div>
+          )}
           <div className="flex items-center justify-between">
             <Label htmlFor="showDataLabels" className="text-xs text-muted-foreground">
               Show Data Labels
@@ -209,6 +242,26 @@ export function PropertyPanel({ properties, onChange, availableFields = [] }: Pr
               className="w-full"
             />
           </div>
+        </div>
+      </Section>
+
+      <Section title="Bar Chart Options" icon={BarChart3} defaultOpen={false}>
+        <div className="space-y-3">
+          <Label className="text-xs text-muted-foreground">Bar Display Mode</Label>
+          <RadioGroup
+            value={properties.barChartMode || "grouped"}
+            onValueChange={(value) => updateProperty("barChartMode", value as "grouped" | "stacked")}
+            className="space-y-2"
+          >
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="grouped" id="bar-grouped" />
+              <Label htmlFor="bar-grouped" className="text-xs">Grouped (Side by Side)</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="stacked" id="bar-stacked" />
+              <Label htmlFor="bar-stacked" className="text-xs">Stacked</Label>
+            </div>
+          </RadioGroup>
         </div>
       </Section>
 
