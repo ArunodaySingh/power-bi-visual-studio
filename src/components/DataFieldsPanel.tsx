@@ -141,7 +141,7 @@ export function DataFieldsPanel({ tables }: DataFieldsPanelProps) {
   );
 }
 
-// Meta Ads table schema for the fields panel
+// Meta Ads table schema for the fields panel (matching database columns)
 export const metaAdsDataTables: DataTable[] = [
   {
     id: "meta_campaigns",
@@ -158,18 +158,6 @@ export const metaAdsDataTables: DataTable[] = [
       { id: "cpc", name: "CPC", type: "metric", dataType: "number", table: "meta_campaigns" },
       { id: "cpm", name: "CPM", type: "metric", dataType: "number", table: "meta_campaigns" },
       { id: "roas", name: "ROAS", type: "metric", dataType: "number", table: "meta_campaigns" },
-    ],
-  },
-  {
-    id: "meta_ad_sets",
-    name: "Meta Ad Sets",
-    fields: [
-      { id: "ad_set_id", name: "Ad Set ID", type: "dimension", dataType: "string", table: "meta_ad_sets" },
-      { id: "ad_set_status", name: "Status", type: "dimension", dataType: "string", table: "meta_ad_sets" },
-      { id: "audience_name", name: "Audience", type: "dimension", dataType: "string", table: "meta_ad_sets" },
-      { id: "budget", name: "Budget", type: "metric", dataType: "number", table: "meta_ad_sets" },
-      { id: "reach", name: "Reach", type: "metric", dataType: "number", table: "meta_ad_sets" },
-      { id: "frequency", name: "Frequency", type: "metric", dataType: "number", table: "meta_ad_sets" },
     ],
   },
 ];
