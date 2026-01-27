@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useDroppable } from "@dnd-kit/core";
-import { X, GripVertical, Sigma, Hash, Type } from "lucide-react";
+import { X, GripVertical, Sigma, Hash, Type, Play } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { DataField, FieldMapping, AggregationType } from "@/types/dashboard";
 import {
@@ -10,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
 
 interface FieldWellProps {
   label: string;
@@ -148,9 +149,10 @@ function FieldChip({
 interface FieldWellsProps {
   fieldMapping: FieldMapping;
   onFieldMappingChange: (mapping: FieldMapping) => void;
+  onApplyData?: () => void;
 }
 
-export function FieldWells({ fieldMapping, onFieldMappingChange }: FieldWellsProps) {
+export function FieldWells({ fieldMapping, onFieldMappingChange, onApplyData }: FieldWellsProps) {
   const handleRemoveField = (wellType: keyof FieldMapping, fieldId: string) => {
     const newMapping = { ...fieldMapping };
     
@@ -178,13 +180,27 @@ export function FieldWells({ fieldMapping, onFieldMappingChange }: FieldWellsPro
     onFieldMappingChange(newMapping);
   };
 
+  const hasAxisAndValues = (fieldMapping.axis?.length ?? 0) > 0 && (fieldMapping.values?.length ?? 0) > 0;
+
   return (
     <div className="space-y-4 overflow-hidden">
-      <div className="flex items-center gap-2 pb-3 border-b">
-        <Sigma className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-        <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
-          Field Wells
-        </h3>
+      <div className="flex items-center justify-between pb-3 border-b">
+        <div className="flex items-center gap-2">
+          <Sigma className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+          <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+            Field Wells
+          </h3>
+        </div>
+        {hasAxisAndValues && onApplyData && (
+          <Button 
+            size="sm" 
+            onClick={onApplyData}
+            className="h-7 px-2 text-xs gap-1"
+          >
+            <Play className="h-3 w-3" />
+            Apply
+          </Button>
+        )}
       </div>
 
       <FieldWell

@@ -518,12 +518,75 @@ function DashboardContent() {
     });
   }, [setCrossFilter]);
 
+  // Transform data based on field mapping
+  const transformDataFromFieldMapping = useCallback((visualId: string, mapping: FieldMapping) => {
+    if (metaAdsData.length === 0) return;
+
+    const axisField = mapping.axis?.[0];
+    const valueFields = mapping.values || [];
+    
+    if (!axisField || valueFields.length === 0) return;
+
+    // Map field IDs to database column names
+    const fieldKeyMap: Record<string, string> = {
+      campaign_name: "campaign_name",
+      ad_set_name: "ad_set_name",
+      date: "date",
+      impressions: "impressions",
+      clicks: "clicks",
+      spend: "spend",
+      conversions: "conversions",
+      ctr: "ctr",
+      cpc: "cpc",
+      cpm: "cpm",
+      roas: "roas",
+    };
+
+    const axisKey = fieldKeyMap[axisField.id] || axisField.id;
+    const valueKey = fieldKeyMap[valueFields[0].id] || valueFields[0].id;
+
+    // Aggregate data by axis field
+    const aggregatedData = new Map<string, number>();
+    metaAdsData.forEach((campaign) => {
+      const axisValue = String(campaign[axisKey as keyof typeof campaign] || "Unknown");
+      const rawValue = campaign[valueKey as keyof typeof campaign];
+      const value = typeof rawValue === "number" ? rawValue : 0;
+      
+      aggregatedData.set(
+        axisValue,
+        (aggregatedData.get(axisValue) || 0) + value
+      );
+    });
+
+    const newData = Array.from(aggregatedData.entries()).map(([category, value]) => ({
+      id: crypto.randomUUID(),
+      category: category.slice(0, 20),
+      value: Math.round(value * 100) / 100,
+    }));
+
+    const visual = visuals.find((v) => v.id === visualId) ||
+      Array.from(slotVisuals.values()).find((v) => v.id === visualId);
+
+    handleUpdateVisual(visualId, {
+      data: newData,
+      fieldMapping: mapping,
+      properties: {
+        ...visual?.properties!,
+        title: `${valueFields[0].name} by ${axisField.name}`,
+      },
+    });
+  }, [metaAdsData, visuals, slotVisuals, handleUpdateVisual]);
+
   // Handle field mapping change for selected visual
   const handleFieldMappingChange = useCallback((mapping: FieldMapping) => {
     if (selectedVisualId) {
       handleUpdateVisual(selectedVisualId, { fieldMapping: mapping });
+      // Also transform data if we have axis and values
+      if (mapping.axis?.length && mapping.values?.length) {
+        transformDataFromFieldMapping(selectedVisualId, mapping);
+      }
     }
-  }, [selectedVisualId, handleUpdateVisual]);
+  }, [selectedVisualId, handleUpdateVisual, transformDataFromFieldMapping]);
 
   // Handle drag start
   const handleDragStart = (event: DragStartEvent) => {
@@ -932,6 +995,12 @@ function DashboardContent() {
                         <FieldWells
                           fieldMapping={selectedVisual.fieldMapping || { axis: [], values: [], tooltips: [] }}
                           onFieldMappingChange={handleFieldMappingChange}
+                          onApplyData={() => {
+                            const mapping = selectedVisual.fieldMapping || { axis: [], values: [], tooltips: [] };
+                            if (mapping.axis?.length && mapping.values?.length) {
+                              transformDataFromFieldMapping(selectedVisual.id, mapping);
+                            }
+                          }}
                         />
                         <div className="border-t pt-4">
                           <h3 className="text-sm font-medium text-muted-foreground mb-3 uppercase tracking-wider">
