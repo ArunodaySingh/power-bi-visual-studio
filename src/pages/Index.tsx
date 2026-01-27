@@ -518,7 +518,7 @@ function DashboardContent() {
     });
   }, [setCrossFilter]);
 
-  // Transform data based on field mapping
+  // Transform data based on field mapping - supports multiple value fields
   const transformDataFromFieldMapping = useCallback((visualId: string, mapping: FieldMapping) => {
     if (metaAdsData.length === 0) return;
 
@@ -543,38 +543,62 @@ function DashboardContent() {
     };
 
     const axisKey = fieldKeyMap[axisField.id] || axisField.id;
-    const valueKey = fieldKeyMap[valueFields[0].id] || valueFields[0].id;
 
-    // Aggregate data by axis field
-    const aggregatedData = new Map<string, number>();
+    // Aggregate data by axis field for all value fields
+    const aggregatedData = new Map<string, Record<string, number>>();
+    
     metaAdsData.forEach((campaign) => {
       const axisValue = String(campaign[axisKey as keyof typeof campaign] || "Unknown");
-      const rawValue = campaign[valueKey as keyof typeof campaign];
-      const value = typeof rawValue === "number" ? rawValue : 0;
       
-      aggregatedData.set(
-        axisValue,
-        (aggregatedData.get(axisValue) || 0) + value
-      );
+      if (!aggregatedData.has(axisValue)) {
+        aggregatedData.set(axisValue, {});
+      }
+      
+      const record = aggregatedData.get(axisValue)!;
+      
+      valueFields.forEach((field, index) => {
+        const valueKey = fieldKeyMap[field.id] || field.id;
+        const rawValue = campaign[valueKey as keyof typeof campaign];
+        const value = typeof rawValue === "number" ? rawValue : 0;
+        const fieldName = index === 0 ? "value" : `value${index + 1}`;
+        record[fieldName] = (record[fieldName] || 0) + value;
+      });
     });
 
-    const newData = Array.from(aggregatedData.entries()).map(([category, value]) => ({
-      id: crypto.randomUUID(),
-      category: category.slice(0, 20),
-      value: Math.round(value * 100) / 100,
-    }));
+    // Create data points with multiple value fields
+    const newData: DataPoint[] = Array.from(aggregatedData.entries()).map(([category, values]) => {
+      const dataPoint: DataPoint = {
+        id: crypto.randomUUID(),
+        category: category.slice(0, 20),
+        value: Math.round((values.value || 0) * 100) / 100,
+      };
+      
+      // Add additional value fields
+      Object.keys(values).forEach((key) => {
+        if (key !== "value") {
+          dataPoint[key] = Math.round((values[key] || 0) * 100) / 100;
+        }
+      });
+      
+      return dataPoint;
+    });
 
     const visual = visuals.find((v) => v.id === visualId) ||
       Array.from(slotVisuals.values()).find((v) => v.id === visualId);
+
+    // Build title from all value field names
+    const valueNames = valueFields.map(f => f.name).join(", ");
 
     handleUpdateVisual(visualId, {
       data: newData,
       fieldMapping: mapping,
       properties: {
         ...visual?.properties!,
-        title: `${valueFields[0].name} by ${axisField.name}`,
+        title: `${valueNames} by ${axisField.name}`,
       },
     });
+    
+    toast.success(`Loaded ${valueFields.length} metric(s) from ${metaAdsData.length} records`);
   }, [metaAdsData, visuals, slotVisuals, handleUpdateVisual]);
 
   // Handle field mapping change for selected visual
@@ -995,12 +1019,6 @@ function DashboardContent() {
                         <FieldWells
                           fieldMapping={selectedVisual.fieldMapping || { axis: [], values: [], tooltips: [] }}
                           onFieldMappingChange={handleFieldMappingChange}
-                          onApplyData={() => {
-                            const mapping = selectedVisual.fieldMapping || { axis: [], values: [], tooltips: [] };
-                            if (mapping.axis?.length && mapping.values?.length) {
-                              transformDataFromFieldMapping(selectedVisual.id, mapping);
-                            }
-                          }}
                         />
                         <div className="border-t pt-4">
                           <h3 className="text-sm font-medium text-muted-foreground mb-3 uppercase tracking-wider">

@@ -23,6 +23,8 @@ export interface DataPoint {
   id: string;
   category: string;
   value: number;
+  // Additional value fields for multi-metric charts
+  [key: string]: string | number;
 }
 
 interface DataEditorProps {

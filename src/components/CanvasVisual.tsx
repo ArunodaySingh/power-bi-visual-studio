@@ -160,6 +160,7 @@ export function CanvasVisual({
           properties={visual.properties}
           onDataClick={onDataClick}
           highlightedValue={highlightedValue}
+          valueFieldNames={visual.fieldMapping?.values?.map(f => f.name)}
         />
         
         {/* Drop indicator overlay */}

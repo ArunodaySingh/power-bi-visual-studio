@@ -34,6 +34,7 @@ interface VisualPreviewProps {
   properties: VisualProperties;
   onDataClick?: (dimension: string, value: string) => void;
   highlightedValue?: string | string[] | null;
+  valueFieldNames?: string[]; // Names of value fields for legend
 }
 
 const CHART_COLORS = [
@@ -47,21 +48,48 @@ const CHART_COLORS = [
   "hsl(90, 60%, 45%)",
 ];
 
+interface ChartDataPoint {
+  name: string;
+  value: number;
+  value2?: number;
+  value3?: number;
+  value4?: number;
+  value5?: number;
+  [key: string]: string | number | undefined;
+}
+
 export function VisualPreview({ 
   type, 
   data, 
   properties, 
   onDataClick,
-  highlightedValue 
+  highlightedValue,
+  valueFieldNames = ["Value"],
 }: VisualPreviewProps) {
-  const chartData = data.map((d) => ({
-    name: d.category,
-    value: d.value,
-  }));
+  // Detect additional value fields in data
+  const valueKeys = data.length > 0 
+    ? Object.keys(data[0]).filter(k => k === "value" || k.match(/^value\d+$/)).sort()
+    : ["value"];
+  
+  const hasMultipleValues = valueKeys.length > 1;
 
-  const handleBarClick = (data: unknown) => {
-    if (onDataClick && data && typeof data === "object" && "name" in data) {
-      onDataClick("category", (data as { name: string }).name);
+  const chartData: ChartDataPoint[] = data.map((d) => {
+    const point: ChartDataPoint = {
+      name: d.category,
+      value: d.value,
+    };
+    // Add additional value fields
+    valueKeys.forEach((key) => {
+      if (key in d && key !== "value") {
+        point[key] = d[key] as number;
+      }
+    });
+    return point;
+  });
+
+  const handleBarClick = (clickData: unknown) => {
+    if (onDataClick && clickData && typeof clickData === "object" && "name" in clickData) {
+      onDataClick("category", (clickData as { name: string }).name);
     }
   };
 
@@ -97,24 +125,29 @@ export function VisualPreview({
                   fontSize: properties.fontSize - 2,
                 }}
               />
-              {properties.showLegend && <Legend />}
-              <Bar
-                dataKey="value"
-                fill={properties.primaryColor}
-                radius={[properties.borderRadius / 2, properties.borderRadius / 2, 0, 0]}
-                animationDuration={properties.animationDuration}
-                label={properties.showDataLabels ? { position: "top", fontSize: properties.fontSize - 2 } : false}
-                onClick={handleBarClick}
-                cursor={onDataClick ? "pointer" : undefined}
-              >
-                {chartData.map((entry, index) => (
-                  <Cell 
-                    key={`cell-${index}`} 
-                    fill={properties.primaryColor}
-                    opacity={isHighlighted(entry.name) ? 1 : 0.3}
-                  />
-                ))}
-              </Bar>
+              {(properties.showLegend || hasMultipleValues) && <Legend />}
+              {/* Render multiple bars for multiple values */}
+              {valueKeys.map((key, idx) => (
+                <Bar
+                  key={key}
+                  dataKey={key}
+                  name={valueFieldNames[idx] || key}
+                  fill={CHART_COLORS[idx % CHART_COLORS.length]}
+                  radius={[properties.borderRadius / 2, properties.borderRadius / 2, 0, 0]}
+                  animationDuration={properties.animationDuration}
+                  label={!hasMultipleValues && properties.showDataLabels ? { position: "top", fontSize: properties.fontSize - 2 } : false}
+                  onClick={handleBarClick}
+                  cursor={onDataClick ? "pointer" : undefined}
+                >
+                  {!hasMultipleValues && chartData.map((entry, index) => (
+                    <Cell 
+                      key={`cell-${index}`} 
+                      fill={properties.primaryColor}
+                      opacity={isHighlighted(entry.name) ? 1 : 0.3}
+                    />
+                  ))}
+                </Bar>
+              ))}
             </BarChart>
           </ResponsiveContainer>
         );
