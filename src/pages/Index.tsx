@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { Database, Settings, LayoutGrid, Hash, Type, Filter } from "lucide-react";
+import { Settings, LayoutGrid, Hash, Type, Filter } from "lucide-react";
 import { DndContext, DragEndEvent, DragStartEvent, useSensor, useSensors, PointerSensor, DragOverlay } from "@dnd-kit/core";
 import { VisualTypeSelector, type VisualType } from "@/components/VisualTypeSelector";
 import { PropertyPanel, type VisualProperties } from "@/components/PropertyPanel";
@@ -834,13 +834,15 @@ function DashboardContent() {
 
           {/* Right Sidebar - Data Fields & Config */}
           {showConfigPanel && (
-            <aside className="w-72 border-l bg-card flex flex-col overflow-hidden">
-              <Tabs defaultValue="fields" className="flex-1 flex flex-col">
-                <TabsList className="mx-4 mt-4 grid grid-cols-3">
-                  <TabsTrigger value="fields" className="gap-1.5 text-xs">
-                    <Database className="h-3.5 w-3.5" />
-                    Fields
-                  </TabsTrigger>
+            <aside className="w-80 border-l bg-card flex flex-col overflow-hidden">
+              {/* Data Fields - Always visible at top */}
+              <div className="h-64 border-b flex-shrink-0 overflow-hidden">
+                <DataFieldsPanel tables={getCurrentDataTables()} />
+              </div>
+              
+              {/* Tabs for Visual/Format */}
+              <Tabs defaultValue="visual" className="flex-1 flex flex-col overflow-hidden">
+                <TabsList className="mx-4 mt-3 grid grid-cols-2">
                   <TabsTrigger value="visual" className="gap-1.5 text-xs">
                     <LayoutGrid className="h-3.5 w-3.5" />
                     Visual
@@ -850,12 +852,8 @@ function DashboardContent() {
                     Format
                   </TabsTrigger>
                 </TabsList>
-                
-                <TabsContent value="fields" className="flex-1 overflow-hidden m-0">
-                  <DataFieldsPanel tables={getCurrentDataTables()} />
-                </TabsContent>
 
-                <TabsContent value="visual" className="flex-1 p-4 overflow-y-auto">
+                <TabsContent value="visual" className="flex-1 p-4 overflow-y-auto m-0">
                   <div className="space-y-4">
                     {selectedVisual ? (
                       <>
