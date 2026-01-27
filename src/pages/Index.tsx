@@ -1,8 +1,6 @@
 import { useState, useCallback } from "react";
-import { Database, Settings, LayoutGrid, Hash, Type, Plus, BarChart3, Table2, CreditCard } from "lucide-react";
+import { Database, Settings, LayoutGrid, Hash, Type } from "lucide-react";
 import { DndContext, DragEndEvent, DragStartEvent, useSensor, useSensors, PointerSensor, DragOverlay } from "@dnd-kit/core";
-import { DashboardHeader } from "@/components/DashboardHeader";
-import { FilterBar } from "@/components/FilterBar";
 import { VisualizationSelector, type VisualizationType } from "@/components/VisualizationSelector";
 import { VisualTypeSelector, type VisualType } from "@/components/VisualTypeSelector";
 import { PropertyPanel, type VisualProperties } from "@/components/PropertyPanel";
@@ -17,20 +15,6 @@ import type { CanvasVisualData } from "@/components/CanvasVisual";
 import { metaAdsRawData } from "@/data/metaAdsData";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-
-// Dashboard tabs configuration
-const dashboardTabs = [
-  { id: "summary", label: "Summary" },
-  { id: "paid-search", label: "Paid Search" },
-  { id: "paid-social", label: "Paid Social" },
-  { id: "youtube", label: "YouTube" },
-  { id: "programmatic", label: "Programmatic" },
-  { id: "direct-buy", label: "Direct Buy" },
-  { id: "adserver", label: "Adserver" },
-  { id: "pop-analysis", label: "PoP Analysis" },
-  { id: "qa", label: "Q&A" },
-  { id: "glossary", label: "Glossary" },
-];
 
 interface SheetData {
   id: string;
@@ -75,12 +59,6 @@ const createEmptySheet = (name: string): SheetData => ({
 });
 
 export default function Index() {
-  const [activeTab, setActiveTab] = useState("summary");
-  const [selectedChannel, setSelectedChannel] = useState("all");
-  const [selectedPlatform, setSelectedPlatform] = useState("all");
-  const [selectedCurrency, setSelectedCurrency] = useState("USD");
-  const [dateRange] = useState({ start: "4/1/2025", end: "12/6/2025" });
-
   const [sheets, setSheets] = useState<SheetData[]>([
     createEmptySheet("Meta Ads"),
     createEmptySheet("GA"),
@@ -283,27 +261,6 @@ export default function Index() {
   return (
     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <div className="h-screen flex flex-col bg-background">
-        {/* Dashboard Header */}
-        <DashboardHeader
-          tabs={dashboardTabs}
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
-        />
-        
-        {/* Filter Bar */}
-        <FilterBar
-          channels={["All", "Search", "Social", "YouTube", "Programmatic", "Direct Buy"]}
-          platforms={["All", "Google", "Meta", "TikTok", "LinkedIn"]}
-          currencies={["USD", "EUR", "GBP", "INR"]}
-          selectedChannel={selectedChannel}
-          selectedPlatform={selectedPlatform}
-          selectedCurrency={selectedCurrency}
-          dateRange={dateRange}
-          onChannelChange={setSelectedChannel}
-          onPlatformChange={setSelectedPlatform}
-          onCurrencyChange={setSelectedCurrency}
-        />
-
         <div className="flex-1 flex overflow-hidden">
           {/* Left Sidebar - Component Palette */}
           <aside className="w-64 border-r bg-card flex flex-col overflow-hidden">
