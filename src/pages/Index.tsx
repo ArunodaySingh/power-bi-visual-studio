@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { Database, Settings, LayoutGrid, Hash, Type } from "lucide-react";
+import { Database, Settings, LayoutGrid, Hash, Type, Filter } from "lucide-react";
 import { DndContext, DragEndEvent, DragStartEvent, useSensor, useSensors, PointerSensor, DragOverlay } from "@dnd-kit/core";
 import { VisualTypeSelector, type VisualType } from "@/components/VisualTypeSelector";
 import { PropertyPanel, type VisualProperties } from "@/components/PropertyPanel";
@@ -10,24 +10,26 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SheetTabs } from "@/components/SheetTabs";
 import { DataFieldsPanel, metaAdsDataTables, type DataField, type DataTable } from "@/components/DataFieldsPanel";
 import { ComponentPalette } from "@/components/ComponentPalette";
-import { type LayoutType, layoutOptions } from "@/components/LayoutPalette";
+import { type LayoutType } from "@/components/LayoutPalette";
 import { type PanelData, generateSlots } from "@/components/DraggablePanel";
 import type { CanvasVisualData } from "@/components/CanvasVisual";
 import type { VisualizationType } from "@/components/VisualizationSelector";
+import type { SlicerType, SlicerData } from "@/types/dashboard";
 import { metaAdsRawData } from "@/data/metaAdsData";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { FilterProvider, useFilters } from "@/contexts/FilterContext";
+import { DropdownSlicer, ListSlicer, DateRangeSlicer, NumericRangeSlicer } from "@/components/slicers";
 
-// Map to store visuals that are placed in panel slots
-// Key: slotId, Value: CanvasVisualData
 type SlotVisualsMap = Map<string, CanvasVisualData>;
 
 interface SheetData {
   id: string;
   name: string;
   panels: PanelData[];
-  visuals: CanvasVisualData[]; // Standalone visuals not in panels
-  slotVisuals: SlotVisualsMap; // Visuals placed in panel slots
+  visuals: CanvasVisualData[];
+  slotVisuals: SlotVisualsMap;
+  slicers: SlicerData[];
 }
 
 const createDefaultData = (): DataPoint[] => [
@@ -68,15 +70,45 @@ const createNewPanel = (layoutType: LayoutType, index: number): PanelData => ({
   slots: generateSlots(layoutType),
 });
 
+const createNewSlicer = (type: SlicerType, field: string, fieldLabel: string, index: number): SlicerData => ({
+  id: crypto.randomUUID(),
+  type,
+  field,
+  fieldLabel,
+  title: fieldLabel,
+  selectedValues: [],
+  position: { x: 50 + (index % 3) * 250, y: 50 },
+  size: { 
+    width: type === "date-range" ? 280 : type === "numeric-range" ? 250 : 220, 
+    height: type === "list" ? 280 : type === "numeric-range" ? 180 : 120 
+  },
+  multiSelect: true,
+  showSearch: type === "list",
+});
+
 const createEmptySheet = (name: string): SheetData => ({
   id: crypto.randomUUID(),
   name,
   panels: [],
   visuals: [],
   slotVisuals: new Map(),
+  slicers: [],
 });
 
-export default function Index() {
+const getDefaultSlicerField = (type: SlicerType): { field: string; label: string } => {
+  switch (type) {
+    case "date-range":
+      return { field: "date", label: "Date" };
+    case "numeric-range":
+      return { field: "spend", label: "Spend" };
+    default:
+      return { field: "campaignName", label: "Campaign" };
+  }
+};
+
+function DashboardContent() {
+  const { filters, addFilter, removeFilter, getFilteredData } = useFilters();
+
   const [sheets, setSheets] = useState<SheetData[]>([
     createEmptySheet("Meta Ads"),
     createEmptySheet("GA"),
@@ -85,23 +117,30 @@ export default function Index() {
   const [activeSheetId, setActiveSheetId] = useState(sheets[0].id);
   const [selectedPanelId, setSelectedPanelId] = useState<string | null>(null);
   const [selectedVisualId, setSelectedVisualId] = useState<string | null>(null);
+  const [selectedSlicerId, setSelectedSlicerId] = useState<string | null>(null);
   const [isLayoutDragging, setIsLayoutDragging] = useState(false);
   const [isComponentDragging, setIsComponentDragging] = useState(false);
   const [isFieldDragging, setIsFieldDragging] = useState(false);
+  const [isSlicerDragging, setIsSlicerDragging] = useState(false);
   const [draggingField, setDraggingField] = useState<DataField | null>(null);
   const [draggingLayout, setDraggingLayout] = useState<LayoutType | null>(null);
   const [draggingComponent, setDraggingComponent] = useState<string | null>(null);
+  const [draggingSlicerType, setDraggingSlicerType] = useState<SlicerType | null>(null);
   const [showConfigPanel, setShowConfigPanel] = useState(true);
+  
+  const [slicerDateRanges, setSlicerDateRanges] = useState<Map<string, { start: Date | null; end: Date | null }>>(new Map());
+  const [slicerNumericRanges, setSlicerNumericRanges] = useState<Map<string, { min: number; max: number }>>(new Map());
 
   const activeSheet = sheets.find((s) => s.id === activeSheetId);
   const panels = activeSheet?.panels || [];
   const visuals = activeSheet?.visuals || [];
   const slotVisuals = activeSheet?.slotVisuals || new Map<string, CanvasVisualData>();
+  const slicers = activeSheet?.slicers || [];
   const selectedVisual = visuals.find((v) => v.id === selectedVisualId) || 
     Array.from(slotVisuals.values()).find((v) => v.id === selectedVisualId);
   const selectedPanel = panels.find((p) => p.id === selectedPanelId);
+  const selectedSlicer = slicers.find((s) => s.id === selectedSlicerId);
 
-  // DnD sensors
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: { distance: 5 },
@@ -111,10 +150,10 @@ export default function Index() {
   // Sheet handlers
   const handleSelectSheet = useCallback((id: string) => {
     setActiveSheetId(id);
-    const sheet = sheets.find((s) => s.id === id);
     setSelectedPanelId(null);
     setSelectedVisualId(null);
-  }, [sheets]);
+    setSelectedSlicerId(null);
+  }, []);
 
   const handleAddSheet = useCallback(() => {
     const newSheet = createEmptySheet(`Sheet ${sheets.length + 1}`);
@@ -174,12 +213,66 @@ export default function Index() {
     setSelectedPanelId((prev) => (prev === id ? null : prev));
   }, [activeSheetId]);
 
-  // Add visual to a panel slot
-  const handleAddVisualToSlot = useCallback((
-    panelId: string, 
-    slotId: string, 
-    type: VisualizationType
-  ) => {
+  // Slicer handlers
+  const handleAddSlicer = useCallback((type: SlicerType, position?: { x: number; y: number }) => {
+    const defaultField = getDefaultSlicerField(type);
+    const newSlicer = createNewSlicer(type, defaultField.field, defaultField.label, slicers.length);
+    if (position) {
+      newSlicer.position = position;
+    }
+    
+    setSheets((prev) =>
+      prev.map((s) =>
+        s.id === activeSheetId ? { ...s, slicers: [...s.slicers, newSlicer] } : s
+      )
+    );
+    setSelectedSlicerId(newSlicer.id);
+    setSelectedPanelId(null);
+    setSelectedVisualId(null);
+    toast.success(`Added ${type} slicer`);
+  }, [slicers.length, activeSheetId]);
+
+  const handleUpdateSlicer = useCallback((id: string, updates: Partial<SlicerData>) => {
+    setSheets((prev) =>
+      prev.map((s) =>
+        s.id === activeSheetId
+          ? { ...s, slicers: s.slicers.map((sl) => (sl.id === id ? { ...sl, ...updates } : sl)) }
+          : s
+      )
+    );
+    
+    // Update filter when slicer values change
+    if (updates.selectedValues !== undefined) {
+      const slicer = slicers.find((s) => s.id === id);
+      if (slicer) {
+        if (updates.selectedValues.length > 0) {
+          addFilter({
+            field: slicer.field,
+            values: updates.selectedValues,
+            operator: "equals",
+          });
+        } else {
+          removeFilter(slicer.field);
+        }
+      }
+    }
+  }, [activeSheetId, slicers, addFilter, removeFilter]);
+
+  const handleDeleteSlicer = useCallback((id: string) => {
+    const slicer = slicers.find((s) => s.id === id);
+    if (slicer) {
+      removeFilter(slicer.field);
+    }
+    setSheets((prev) =>
+      prev.map((s) =>
+        s.id === activeSheetId ? { ...s, slicers: s.slicers.filter((sl) => sl.id !== id) } : s
+      )
+    );
+    setSelectedSlicerId((prev) => (prev === id ? null : prev));
+  }, [activeSheetId, slicers, removeFilter]);
+
+  // Visual to slot handlers
+  const handleAddVisualToSlot = useCallback((panelId: string, slotId: string, type: VisualizationType) => {
     const visualType = (type || "bar") as VisualType;
     const newVisual = createNewVisual(0, visualType);
     
@@ -187,11 +280,9 @@ export default function Index() {
       prev.map((s) => {
         if (s.id !== activeSheetId) return s;
         
-        // Add to slotVisuals map
         const newSlotVisuals = new Map(s.slotVisuals);
         newSlotVisuals.set(slotId, newVisual);
         
-        // Update the panel slot to reference this visual
         const updatedPanels = s.panels.map((p) => {
           if (p.id !== panelId) return p;
           return {
@@ -211,18 +302,15 @@ export default function Index() {
     toast.success(`Added ${visualType} chart to panel`);
   }, [activeSheetId]);
 
-  // Remove visual from a panel slot
   const handleRemoveVisualFromSlot = useCallback((panelId: string, slotId: string) => {
     setSheets((prev) =>
       prev.map((s) => {
         if (s.id !== activeSheetId) return s;
         
-        // Remove from slotVisuals map
         const newSlotVisuals = new Map(s.slotVisuals);
         const visual = newSlotVisuals.get(slotId);
         newSlotVisuals.delete(slotId);
         
-        // Update the panel slot to remove reference
         const updatedPanels = s.panels.map((p) => {
           if (p.id !== panelId) return p;
           return {
@@ -233,7 +321,6 @@ export default function Index() {
           };
         });
         
-        // Clear selection if this visual was selected
         if (visual && visual.id === selectedVisualId) {
           setSelectedVisualId(null);
         }
@@ -249,7 +336,6 @@ export default function Index() {
       prev.map((s) => {
         if (s.id !== activeSheetId) return s;
         
-        // Check if it's a standalone visual
         const standaloneIndex = s.visuals.findIndex((v) => v.id === id);
         if (standaloneIndex >= 0) {
           return {
@@ -258,7 +344,6 @@ export default function Index() {
           };
         }
         
-        // Check if it's a slot visual
         const newSlotVisuals = new Map(s.slotVisuals);
         for (const [slotId, visual] of newSlotVisuals) {
           if (visual.id === id) {
@@ -331,30 +416,35 @@ export default function Index() {
 
   // Handle field dropped onto visual
   const handleFieldDropped = useCallback((visualId: string, field: DataField) => {
-    const newData: DataPoint[] = metaAdsRawData.map((campaign) => {
+    const filteredData = getFilteredData(metaAdsRawData as unknown as Record<string, unknown>[]);
+    const newData: DataPoint[] = filteredData.map((campaign) => {
       let value = 0;
-      const fieldKey = field.id as keyof typeof campaign;
+      const fieldKey = field.id;
       if (fieldKey in campaign) {
         const rawValue = campaign[fieldKey];
         value = typeof rawValue === "number" ? rawValue : 0;
       }
+      const campaignName = campaign["campaignName"] as string;
       return {
         id: crypto.randomUUID(),
-        category: campaign.campaignName.slice(0, 20),
+        category: campaignName ? campaignName.slice(0, 20) : "Unknown",
         value: Math.round(value * 100) / 100,
       };
     });
 
+    const visual = visuals.find((v) => v.id === visualId) ||
+      Array.from(slotVisuals.values()).find((v) => v.id === visualId);
+
     handleUpdateVisual(visualId, {
       data: newData,
       properties: {
-        ...visuals.find((v) => v.id === visualId)?.properties!,
+        ...visual?.properties!,
         title: field.name + " by Campaign",
       },
     });
 
     toast.success(`Added "${field.name}" to visual`);
-  }, [handleUpdateVisual, visuals]);
+  }, [handleUpdateVisual, visuals, slotVisuals, getFilteredData]);
 
   // Get data tables for current sheet
   const getCurrentDataTables = (): DataTable[] => {
@@ -362,6 +452,11 @@ export default function Index() {
       return metaAdsDataTables;
     }
     return [];
+  };
+
+  // Get available values for slicer field
+  const getSlicerValues = (field: string): (string | number)[] => {
+    return metaAdsRawData.map((item) => item[field as keyof typeof item] as string | number);
   };
 
   // Handle drag start
@@ -379,6 +474,9 @@ export default function Index() {
     } else if (id.startsWith("field-")) {
       setIsFieldDragging(true);
       setDraggingField(data?.field || null);
+    } else if (id.startsWith("slicer-type-")) {
+      setIsSlicerDragging(true);
+      setDraggingSlicerType(data?.slicerType || null);
     }
   };
 
@@ -392,9 +490,11 @@ export default function Index() {
     setIsLayoutDragging(false);
     setIsComponentDragging(false);
     setIsFieldDragging(false);
+    setIsSlicerDragging(false);
     setDraggingLayout(null);
     setDraggingComponent(null);
     setDraggingField(null);
+    setDraggingSlicerType(null);
 
     // Handle layout drop on canvas
     if (activeId.startsWith("layout-") && over) {
@@ -402,8 +502,19 @@ export default function Index() {
       if (overId === "canvas-drop") {
         const layoutType = activeData?.layout?.type as LayoutType;
         if (layoutType) {
-          // Calculate drop position (approximate center of viewport)
           handleAddPanel(layoutType, { x: 100, y: 100 });
+        }
+      }
+      return;
+    }
+
+    // Handle slicer type drop on canvas
+    if (activeId.startsWith("slicer-type-") && over) {
+      const overId = over.id as string;
+      if (overId === "canvas-drop") {
+        const slicerType = activeData?.slicerType as SlicerType;
+        if (slicerType) {
+          handleAddSlicer(slicerType, { x: 100, y: 100 });
         }
       }
       return;
@@ -417,7 +528,6 @@ export default function Index() {
       if (overId === "canvas-drop" && componentType) {
         handleAddVisual(componentType, { x: 100, y: 100 });
       } else if (overId.startsWith("slot-") && componentType) {
-        // Drop into a panel slot - use the droppable data
         const overData = over.data.current;
         if (overData?.type === "slot" && overData.panelId && overData.slotId) {
           handleAddVisualToSlot(overData.panelId, overData.slotId, componentType);
@@ -435,6 +545,21 @@ export default function Index() {
         if (fieldData) {
           handleFieldDropped(visualId, fieldData);
         }
+      }
+      return;
+    }
+
+    // Handle slicer drag
+    if (activeId.startsWith("slicer-") && !activeId.startsWith("slicer-type-")) {
+      const slicerId = activeId.replace("slicer-", "");
+      const slicer = slicers.find((s) => s.id === slicerId);
+      if (slicer) {
+        handleUpdateSlicer(slicerId, {
+          position: {
+            x: slicer.position.x + delta.x,
+            y: slicer.position.y + delta.y,
+          },
+        });
       }
       return;
     }
@@ -475,6 +600,7 @@ export default function Index() {
             <ComponentPalette 
               onAddVisual={handleAddVisual} 
               onAddLayout={handleAddPanel}
+              onAddSlicer={handleAddSlicer}
             />
           </aside>
 
@@ -490,6 +616,17 @@ export default function Index() {
                 <span className="px-2 py-0.5 bg-secondary text-secondary-foreground text-xs rounded font-medium">
                   {visuals.length} visual{visuals.length !== 1 ? "s" : ""}
                 </span>
+                {slicers.length > 0 && (
+                  <span className="px-2 py-0.5 bg-accent text-accent-foreground text-xs rounded font-medium flex items-center gap-1">
+                    <Filter className="h-3 w-3" />
+                    {slicers.length} filter{slicers.length !== 1 ? "s" : ""}
+                  </span>
+                )}
+                {filters.length > 0 && (
+                  <span className="px-2 py-0.5 bg-destructive/10 text-destructive text-xs rounded font-medium">
+                    {filters.length} active
+                  </span>
+                )}
               </div>
               <div className="flex items-center gap-2">
                 {selectedVisual && (
@@ -509,15 +646,85 @@ export default function Index() {
               </div>
             </div>
 
-            {/* Canvas */}
-            <div className="flex-1 p-4 bg-muted/30 canvas-grid overflow-auto">
+            {/* Canvas with Slicers */}
+            <div className="flex-1 p-4 bg-muted/30 canvas-grid overflow-auto relative">
+              {/* Render Slicers */}
+              {slicers.map((slicer) => {
+                const slicerProps = {
+                  slicer,
+                  isSelected: selectedSlicerId === slicer.id,
+                  onSelect: () => {
+                    setSelectedSlicerId(slicer.id);
+                    setSelectedPanelId(null);
+                    setSelectedVisualId(null);
+                  },
+                  onUpdate: (updates: Partial<SlicerData>) => handleUpdateSlicer(slicer.id, updates),
+                  onDelete: () => handleDeleteSlicer(slicer.id),
+                };
+
+                if (slicer.type === "dropdown") {
+                  return (
+                    <DropdownSlicer
+                      key={slicer.id}
+                      {...slicerProps}
+                      availableValues={getSlicerValues(slicer.field)}
+                    />
+                  );
+                }
+                if (slicer.type === "list") {
+                  return (
+                    <ListSlicer
+                      key={slicer.id}
+                      {...slicerProps}
+                      availableValues={getSlicerValues(slicer.field)}
+                    />
+                  );
+                }
+                if (slicer.type === "date-range") {
+                  return (
+                    <DateRangeSlicer
+                      key={slicer.id}
+                      {...slicerProps}
+                      dateRange={slicerDateRanges.get(slicer.id) || { start: null, end: null }}
+                      onDateRangeChange={(range) => {
+                        setSlicerDateRanges((prev) => new Map(prev).set(slicer.id, range));
+                      }}
+                    />
+                  );
+                }
+                if (slicer.type === "numeric-range") {
+                  const values = getSlicerValues(slicer.field).filter((v) => typeof v === "number") as number[];
+                  const defaultMin = values.length ? Math.min(...values) : 0;
+                  const defaultMax = values.length ? Math.max(...values) : 100;
+                  return (
+                    <NumericRangeSlicer
+                      key={slicer.id}
+                      {...slicerProps}
+                      availableValues={values}
+                      range={slicerNumericRanges.get(slicer.id) || { min: defaultMin, max: defaultMax }}
+                      onRangeChange={(range) => {
+                        setSlicerNumericRanges((prev) => new Map(prev).set(slicer.id, range));
+                        addFilter({
+                          field: slicer.field,
+                          values: [],
+                          operator: "between",
+                          numericRange: range,
+                        });
+                      }}
+                    />
+                  );
+                }
+                return null;
+              })}
+
+              {/* Panel Canvas */}
               <PanelCanvas
                 panels={panels}
                 visuals={visuals}
                 slotVisuals={slotVisuals}
                 selectedPanelId={selectedPanelId}
                 selectedVisualId={selectedVisualId}
-                isLayoutDragging={isLayoutDragging}
+                isLayoutDragging={isLayoutDragging || isSlicerDragging}
                 isFieldDragging={isFieldDragging}
                 onSelectPanel={setSelectedPanelId}
                 onSelectVisual={setSelectedVisualId}
@@ -595,9 +802,29 @@ export default function Index() {
                           <span>{selectedPanel.slots.length}</span>
                         </div>
                       </div>
+                    ) : selectedSlicer ? (
+                      <div className="space-y-3">
+                        <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                          Slicer Settings
+                        </h3>
+                        <div className="text-sm">
+                          <span className="text-muted-foreground">Type: </span>
+                          <span className="capitalize">{selectedSlicer.type.replace("-", " ")}</span>
+                        </div>
+                        <div className="text-sm">
+                          <span className="text-muted-foreground">Field: </span>
+                          <span>{selectedSlicer.fieldLabel}</span>
+                        </div>
+                        {selectedSlicer.selectedValues.length > 0 && (
+                          <div className="text-sm">
+                            <span className="text-muted-foreground">Selected: </span>
+                            <span>{selectedSlicer.selectedValues.length} value(s)</span>
+                          </div>
+                        )}
+                      </div>
                     ) : (
                       <div className="text-sm text-muted-foreground text-center py-8">
-                        Select a visual or panel to edit
+                        Select a visual, panel, or slicer to edit
                       </div>
                     )}
                   </div>
@@ -632,17 +859,31 @@ export default function Index() {
             <span className="capitalize">{draggingComponent}</span>
           </div>
         )}
+        {draggingSlicerType && (
+          <div className="flex items-center gap-2 px-4 py-3 bg-card border rounded-lg shadow-lg text-sm font-medium">
+            <Filter className="h-4 w-4 text-primary" />
+            <span className="capitalize">{draggingSlicerType.replace("-", " ")} Slicer</span>
+          </div>
+        )}
         {draggingField && (
           <div className="flex items-center gap-2 px-3 py-2 bg-card border rounded-lg shadow-lg text-sm font-medium">
             {draggingField.type === "metric" ? (
               <Hash className="h-4 w-4 text-primary" />
             ) : (
-              <Type className="h-4 w-4 text-amber-500" />
+              <Type className="h-4 w-4 text-muted-foreground" />
             )}
             {draggingField.name}
           </div>
         )}
       </DragOverlay>
     </DndContext>
+  );
+}
+
+export default function Index() {
+  return (
+    <FilterProvider>
+      <DashboardContent />
+    </FilterProvider>
   );
 }
