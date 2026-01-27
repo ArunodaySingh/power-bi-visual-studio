@@ -535,10 +535,11 @@ function DashboardContent() {
     // Handle slicer type drop on canvas
     if (activeId.startsWith("slicer-type-") && over) {
       const overId = over.id as string;
-      if (overId === "canvas-drop") {
+      // Accept drops on canvas-drop or any canvas-like area (not on specific slots/visuals)
+      if (overId === "canvas-drop" || !overId.startsWith("slot-") && !overId.startsWith("drop-") && !overId.startsWith("visual-")) {
         const slicerType = activeData?.slicerType as SlicerType;
         if (slicerType) {
-          handleAddSlicer(slicerType, { x: 100, y: 100 });
+          handleAddSlicer(slicerType, { x: 100, y: 50 });
         }
       }
       return;
@@ -563,11 +564,33 @@ function DashboardContent() {
     // Handle field drop onto visual
     if (activeId.startsWith("field-") && over) {
       const overId = over.id as string;
-      if (overId.startsWith("drop-")) {
-        const visualId = overId.replace("drop-", "");
-        const fieldData = activeData?.field as DataField | undefined;
-        if (fieldData) {
+      const fieldData = activeData?.field as DataField | undefined;
+      
+      if (fieldData) {
+        // Handle drop on standalone visual
+        if (overId.startsWith("drop-")) {
+          const visualId = overId.replace("drop-", "");
           handleFieldDropped(visualId, fieldData);
+          return;
+        }
+        
+        // Handle drop on visual-drop zone (from VisualDropZone)
+        if (overId.startsWith("visual-drop-")) {
+          const visualId = overId.replace("visual-drop-", "");
+          handleFieldDropped(visualId, fieldData);
+          return;
+        }
+        
+        // Handle drop on slot that has a visual
+        if (overId.startsWith("slot-")) {
+          const overData = over.data.current;
+          if (overData?.slotId) {
+            const visual = slotVisuals.get(overData.slotId);
+            if (visual) {
+              handleFieldDropped(visual.id, fieldData);
+              return;
+            }
+          }
         }
       }
       return;
