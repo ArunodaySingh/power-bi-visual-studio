@@ -18,7 +18,7 @@ export interface MetaAdsCampaign {
 }
 
 export function useMetaAdsData() {
-  return useQuery({
+  const query = useQuery({
     queryKey: ["meta-ads-campaigns"],
     queryFn: async (): Promise<MetaAdsCampaign[]> => {
       const { data, error } = await supabase
@@ -48,7 +48,14 @@ export function useMetaAdsData() {
         date: row.date,
       }));
     },
+    retry: 2,
+    staleTime: 1000 * 60 * 5, // 5 minutes
   });
+
+  return {
+    ...query,
+    refetch: query.refetch,
+  };
 }
 
 // Helper to get unique values for slicer filters

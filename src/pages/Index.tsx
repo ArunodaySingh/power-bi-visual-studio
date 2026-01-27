@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { Settings, LayoutGrid, Hash, Type, Filter, Loader2, Database } from "lucide-react";
+import { Settings, LayoutGrid, Hash, Type, Filter, Loader2, Database, RefreshCw, AlertCircle } from "lucide-react";
 import { DndContext, DragEndEvent, DragStartEvent, useSensor, useSensors, PointerSensor, DragOverlay } from "@dnd-kit/core";
 import { VisualTypeSelector, type VisualType } from "@/components/VisualTypeSelector";
 import { PropertyPanel, type VisualProperties } from "@/components/PropertyPanel";
@@ -116,7 +116,7 @@ const getDefaultSlicerField = (type: SlicerType): { field: string; label: string
 function DashboardContent() {
   const { filters, addFilter, removeFilter, getFilteredData } = useFilters();
   const { crossFilter, setCrossFilter, clearCrossFilter } = useCrossFilter();
-  const { data: metaAdsData = [], isLoading: isLoadingMetaAds } = useMetaAdsData();
+  const { data: metaAdsData = [], isLoading: isLoadingMetaAds, error: metaAdsError, refetch: refetchMetaAds, isFetching: isFetchingMetaAds } = useMetaAdsData();
 
   const [sheets, setSheets] = useState<SheetData[]>([
     createEmptySheet("Meta Ads"),
@@ -747,12 +747,32 @@ function DashboardContent() {
                     <Loader2 className="h-3 w-3 animate-spin" />
                     Loading data...
                   </span>
-                ) : metaAdsData.length > 0 && (
+                ) : metaAdsError ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-6 px-2 text-xs text-destructive border-destructive/30 hover:bg-destructive/10"
+                    onClick={() => refetchMetaAds()}
+                  >
+                    <AlertCircle className="h-3 w-3 mr-1" />
+                    Failed to load - Retry
+                  </Button>
+                ) : (
                   <span className="px-2 py-0.5 bg-primary/10 text-primary text-xs rounded font-medium flex items-center gap-1">
                     <Database className="h-3 w-3" />
                     {metaAdsData.length} records
                   </span>
                 )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0"
+                  onClick={() => refetchMetaAds()}
+                  disabled={isFetchingMetaAds}
+                  title="Refresh data"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${isFetchingMetaAds ? 'animate-spin' : ''}`} />
+                </Button>
               </div>
               <div className="flex items-center gap-2">
                 <Button
