@@ -104,6 +104,12 @@ export function VisualPreview({
   const renderChart = () => {
     switch (type) {
       case "bar":
+        const isStacked = properties.barChartMode === "stacked" && hasMultipleValues;
+        const legendPosition = properties.legendPosition || "bottom";
+        const legendLayout = legendPosition === "left" || legendPosition === "right" ? "vertical" : "horizontal";
+        const legendAlign = legendPosition === "left" ? "left" : legendPosition === "right" ? "right" : "center";
+        const legendVerticalAlign = legendPosition === "top" ? "top" : legendPosition === "bottom" ? "bottom" : "middle";
+        
         return (
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={chartData} margin={{ top: 20, right: 30, left: 0, bottom: 5 }}>
@@ -125,7 +131,14 @@ export function VisualPreview({
                   fontSize: properties.fontSize - 2,
                 }}
               />
-              {(properties.showLegend || hasMultipleValues) && <Legend />}
+              {(properties.showLegend || hasMultipleValues) && (
+                <Legend 
+                  layout={legendLayout}
+                  align={legendAlign}
+                  verticalAlign={legendVerticalAlign}
+                  wrapperStyle={legendPosition === "left" || legendPosition === "right" ? { paddingLeft: 10, paddingRight: 10 } : {}}
+                />
+              )}
               {/* Render multiple bars for multiple values */}
               {valueKeys.map((key, idx) => (
                 <Bar
@@ -133,7 +146,8 @@ export function VisualPreview({
                   dataKey={key}
                   name={valueFieldNames[idx] || key}
                   fill={CHART_COLORS[idx % CHART_COLORS.length]}
-                  radius={[properties.borderRadius / 2, properties.borderRadius / 2, 0, 0]}
+                  stackId={isStacked ? "stack" : undefined}
+                  radius={isStacked ? (idx === valueKeys.length - 1 ? [properties.borderRadius / 2, properties.borderRadius / 2, 0, 0] : 0) : [properties.borderRadius / 2, properties.borderRadius / 2, 0, 0]}
                   animationDuration={properties.animationDuration}
                   label={!hasMultipleValues && properties.showDataLabels ? { position: "top", fontSize: properties.fontSize - 2 } : false}
                   onClick={handleBarClick}

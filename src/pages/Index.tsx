@@ -44,12 +44,14 @@ const createDefaultProperties = (): VisualProperties => ({
   title: "New Visual",
   showTitle: true,
   showLegend: false,
+  legendPosition: "bottom",
   showDataLabels: true,
   primaryColor: "#0ea5e9",
   backgroundColor: "#ffffff",
   fontSize: 14,
   borderRadius: 8,
   animationDuration: 500,
+  barChartMode: "grouped",
 });
 
 const createNewVisual = (index: number, type: VisualType = "bar"): CanvasVisualData => ({
