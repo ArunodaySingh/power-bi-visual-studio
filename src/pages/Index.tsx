@@ -1047,6 +1047,7 @@ function DashboardContent() {
                 selectedVisualId={selectedVisualId}
                 isLayoutDragging={isLayoutDragging || isSlicerDragging}
                 isFieldDragging={isFieldDragging}
+                isComponentDragging={isComponentDragging}
                 crossFilterVisualId={crossFilter?.sourceVisualId || null}
                 highlightedValue={crossFilter?.value || null}
                 onSelectPanel={setSelectedPanelId}

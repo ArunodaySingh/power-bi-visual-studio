@@ -67,6 +67,7 @@ interface PanelSlotDropZoneProps {
   onRemoveVisual?: () => void;
   onSelectVisual?: () => void;
   isSelected?: boolean;
+  isComponentDragging?: boolean;
 }
 
 function PanelSlotDropZone({ 
@@ -75,7 +76,8 @@ function PanelSlotDropZone({
   visual, 
   onRemoveVisual,
   onSelectVisual,
-  isSelected 
+  isSelected,
+  isComponentDragging 
 }: PanelSlotDropZoneProps) {
   const { setNodeRef, isOver } = useDroppable({
     id: `slot-${panelId}-${slot.id}`,
@@ -83,6 +85,7 @@ function PanelSlotDropZone({
   });
 
   const hasVisual = !!visual;
+  const showDragHint = isComponentDragging && !hasVisual;
 
   return (
     <div
@@ -99,7 +102,9 @@ function PanelSlotDropZone({
           ? "border-primary bg-primary/10 border-solid" 
           : hasVisual 
             ? "border-border bg-card"
-            : "border-dashed border-muted-foreground/30 bg-muted/20 hover:border-muted-foreground/50",
+            : showDragHint
+              ? "border-dashed border-primary/50 bg-primary/5"
+              : "border-dashed border-muted-foreground/30 bg-muted/20 hover:border-muted-foreground/50",
         isSelected && hasVisual && "ring-2 ring-primary"
       )}
     >
@@ -128,10 +133,16 @@ function PanelSlotDropZone({
           </Button>
         </div>
       ) : (
-        <div className="w-full h-full flex-1 flex items-center justify-center p-4">
-          <div className="text-sm text-muted-foreground flex flex-col items-center gap-2">
+        <div className={cn(
+          "w-full h-full flex-1 flex items-center justify-center p-4",
+          showDragHint && "animate-pulse"
+        )}>
+          <div className={cn(
+            "text-sm flex flex-col items-center gap-2",
+            showDragHint ? "text-primary" : "text-muted-foreground"
+          )}>
             <Plus className="h-5 w-5" />
-            <span>Drop chart</span>
+            <span>{showDragHint ? "Drop here!" : "Drop chart"}</span>
           </div>
         </div>
       )}
@@ -153,6 +164,7 @@ interface DraggablePanelProps {
   isSelected: boolean;
   slotVisuals: Map<string, CanvasVisualData>; // Map of slotId -> visual
   selectedSlotVisualId?: string | null;
+  isComponentDragging?: boolean;
   onSelect: () => void;
   onUpdate: (updates: Partial<PanelData>) => void;
   onDelete: () => void;
@@ -165,6 +177,7 @@ export function DraggablePanel({
   isSelected,
   slotVisuals,
   selectedSlotVisualId,
+  isComponentDragging,
   onSelect,
   onUpdate,
   onDelete,
@@ -263,6 +276,7 @@ export function DraggablePanel({
               panelId={panel.id}
               visual={visual}
               isSelected={visual?.id === selectedSlotVisualId}
+              isComponentDragging={isComponentDragging}
               onRemoveVisual={() => onRemoveVisualFromSlot(slot.id)}
               onSelectVisual={() => {
                 if (visual) onSelectSlotVisual(visual.id);
