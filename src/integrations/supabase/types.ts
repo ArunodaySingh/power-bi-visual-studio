@@ -14,6 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      dashboards: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          sheets_data: Json
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          sheets_data?: Json
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          sheets_data?: Json
+          updated_at?: string
+        }
+        Relationships: []
+      }
       meta_ads_campaigns: {
         Row: {
           ad_set_name: string
