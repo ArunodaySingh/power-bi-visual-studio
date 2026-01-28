@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
-import { Settings, LayoutGrid, Hash, Type, Filter, Loader2, Database, RefreshCw, AlertCircle } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Settings, LayoutGrid, Hash, Type, Filter, Loader2, Database, RefreshCw, AlertCircle, Save, ArrowLeft } from "lucide-react";
 import { DndContext, DragEndEvent, DragStartEvent, useSensor, useSensors, PointerSensor, DragOverlay } from "@dnd-kit/core";
 import { VisualTypeSelector, type VisualType } from "@/components/VisualTypeSelector";
 import { PropertyPanel, type VisualProperties } from "@/components/PropertyPanel";
@@ -18,10 +19,13 @@ import type { VisualizationType } from "@/components/VisualizationSelector";
 import type { SlicerType, SlicerData, FieldMapping } from "@/types/dashboard";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { FilterProvider, useFilters } from "@/contexts/FilterContext";
 import { CrossFilterProvider, useCrossFilter } from "@/contexts/CrossFilterContext";
 import { DropdownSlicer, ListSlicer, DateRangeSlicer, NumericRangeSlicer } from "@/components/slicers";
 import { useMetaAdsData, getUniqueValues } from "@/hooks/useMetaAdsData";
+import { supabase } from "@/integrations/supabase/client";
 
 type SlotVisualsMap = Map<string, CanvasVisualData>;
 
@@ -116,6 +120,7 @@ const getDefaultSlicerField = (type: SlicerType): { field: string; label: string
 };
 
 function DashboardContent() {
+  const navigate = useNavigate();
   const { filters, addFilter, removeFilter, getFilteredData } = useFilters();
   const { crossFilter, setCrossFilter, clearCrossFilter } = useCrossFilter();
   const { data: metaAdsData = [], isLoading: isLoadingMetaAds, error: metaAdsError, refetch: refetchMetaAds, isFetching: isFetchingMetaAds } = useMetaAdsData();
@@ -143,6 +148,12 @@ function DashboardContent() {
   const [slicerDateRanges, setSlicerDateRanges] = useState<Map<string, { start: Date | null; end: Date | null }>>(new Map());
   const [slicerNumericRanges, setSlicerNumericRanges] = useState<Map<string, { min: number; max: number }>>(new Map());
 
+  // Save dialog state
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [dashboardName, setDashboardName] = useState("");
+  const [dashboardDescription, setDashboardDescription] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+
   const activeSheet = sheets.find((s) => s.id === activeSheetId);
   const panels = activeSheet?.panels || [];
   const visuals = activeSheet?.visuals || [];
@@ -158,6 +169,42 @@ function DashboardContent() {
       activationConstraint: { distance: 5 },
     })
   );
+
+  // Save dashboard to database
+  const handleSaveDashboard = useCallback(async () => {
+    if (!dashboardName.trim()) {
+      toast.error("Please enter a dashboard name");
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      // Convert slotVisuals Map to plain object for JSON storage
+      const sheetsForStorage = sheets.map((sheet) => ({
+        ...sheet,
+        slotVisuals: Object.fromEntries(sheet.slotVisuals),
+      }));
+
+      const { error } = await supabase.from("dashboards").insert([{
+        name: dashboardName.trim(),
+        description: dashboardDescription.trim() || null,
+        sheets_data: JSON.parse(JSON.stringify(sheetsForStorage)),
+      }]);
+
+      if (error) throw error;
+
+      toast.success("Dashboard saved successfully!");
+      setShowSaveDialog(false);
+      setDashboardName("");
+      setDashboardDescription("");
+      navigate("/dashboards");
+    } catch (error) {
+      console.error("Error saving dashboard:", error);
+      toast.error("Failed to save dashboard");
+    } finally {
+      setIsSaving(false);
+    }
+  }, [dashboardName, dashboardDescription, sheets, navigate]);
 
   // Sheet handlers
   const handleSelectSheet = useCallback((id: string) => {
@@ -813,6 +860,10 @@ function DashboardContent() {
             {/* Canvas Toolbar */}
             <div className="h-12 border-b bg-card px-4 flex items-center justify-between">
               <div className="flex items-center gap-3">
+                <Button variant="ghost" size="sm" onClick={() => navigate("/")}>
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Back
+                </Button>
                 <span className="text-sm font-medium">Canvas</span>
                 <span className="px-2 py-0.5 bg-primary/10 text-primary text-xs rounded font-medium">
                   {panels.length} panel{panels.length !== 1 ? "s" : ""}
@@ -884,6 +935,13 @@ function DashboardContent() {
                   onClick={() => setShowConfigPanel(!showConfigPanel)}
                 >
                   {showConfigPanel ? "Hide Right" : "Show Right"}
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => setShowSaveDialog(true)}
+                >
+                  <Save className="h-4 w-4 mr-2" />
+                  Save Dashboard
                 </Button>
               </div>
             </div>
@@ -1117,6 +1175,54 @@ function DashboardContent() {
           </div>
         )}
       </DragOverlay>
+
+      {/* Save Dashboard Dialog */}
+      <Dialog open={showSaveDialog} onOpenChange={setShowSaveDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Save Dashboard</DialogTitle>
+            <DialogDescription>
+              Give your dashboard a name and optional description
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Dashboard Name</label>
+              <Input
+                placeholder="My Dashboard"
+                value={dashboardName}
+                onChange={(e) => setDashboardName(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Description (optional)</label>
+              <Input
+                placeholder="Describe your dashboard..."
+                value={dashboardDescription}
+                onChange={(e) => setDashboardDescription(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSaveDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveDashboard} disabled={isSaving || !dashboardName.trim()}>
+              {isSaving ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4 mr-2" />
+                  Save
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </DndContext>
   );
 }
