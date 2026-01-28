@@ -12,6 +12,7 @@ interface PanelCanvasProps {
   selectedVisualId: string | null;
   isLayoutDragging?: boolean;
   isFieldDragging?: boolean;
+  isComponentDragging?: boolean;
   crossFilterVisualId?: string | null;
   highlightedValue?: string | string[] | null;
   onSelectPanel: (id: string | null) => void;
@@ -33,6 +34,7 @@ export function PanelCanvas({
   selectedVisualId,
   isLayoutDragging,
   isFieldDragging,
+  isComponentDragging,
   crossFilterVisualId,
   highlightedValue,
   onSelectPanel,
@@ -86,6 +88,7 @@ export function PanelCanvas({
           isSelected={selectedPanelId === panel.id}
           slotVisuals={getPanelSlotVisuals(panel)}
           selectedSlotVisualId={selectedVisualId}
+          isComponentDragging={isComponentDragging}
           onSelect={() => {
             onSelectPanel(panel.id);
             onSelectVisual(null);
