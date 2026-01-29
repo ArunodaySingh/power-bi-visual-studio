@@ -16,7 +16,7 @@ import { type LayoutType } from "@/components/LayoutPalette";
 import { type PanelData, generateSlots } from "@/components/DraggablePanel";
 import type { CanvasVisualData } from "@/components/CanvasVisual";
 import type { VisualizationType } from "@/components/VisualizationSelector";
-import type { SlicerType, SlicerData, FieldMapping } from "@/types/dashboard";
+import type { SlicerType, SlicerData, FieldMapping, TimeGranularity } from "@/types/dashboard";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,6 +27,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { DropdownSlicer, ListSlicer, DateRangeSlicer, NumericRangeSlicer } from "@/components/slicers";
 import { useMetaAdsData, getUniqueValues } from "@/hooks/useMetaAdsData";
 import { supabase } from "@/integrations/supabase/client";
+import { startOfWeek, startOfMonth, startOfQuarter, startOfYear, format } from "date-fns";
 
 type SlotVisualsMap = Map<string, CanvasVisualData>;
 
@@ -580,7 +581,30 @@ function DashboardContent() {
     });
   }, [setCrossFilter]);
 
-  // Transform data based on field mapping - supports multiple value fields
+  // Helper function to get time period key based on granularity
+  const getTimePeriodKey = (dateStr: string, granularity: TimeGranularity): string => {
+    if (granularity === "none" || !dateStr) return dateStr;
+    
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return dateStr;
+    
+    switch (granularity) {
+      case "day":
+        return format(date, "yyyy-MM-dd");
+      case "week":
+        return format(startOfWeek(date, { weekStartsOn: 1 }), "'Week of' MMM d, yyyy");
+      case "month":
+        return format(startOfMonth(date), "MMM yyyy");
+      case "quarter":
+        return format(startOfQuarter(date), "'Q'Q yyyy");
+      case "year":
+        return format(startOfYear(date), "yyyy");
+      default:
+        return dateStr;
+    }
+  };
+
+  // Transform data based on field mapping - supports multiple value fields and time granularity
   const transformDataFromFieldMapping = useCallback((visualId: string, mapping: FieldMapping) => {
     if (metaAdsData.length === 0) return;
 
@@ -605,12 +629,20 @@ function DashboardContent() {
     };
 
     const axisKey = fieldKeyMap[axisField.id] || axisField.id;
+    
+    // Get the time granularity from the first value field (or use none)
+    const timeGranularity = valueFields[0]?.timeGranularity || "none";
 
-    // Aggregate data by axis field for all value fields
-    const aggregatedData = new Map<string, Record<string, number>>();
+    // Aggregate data by axis field (with time period if applicable) for all value fields
+    const aggregatedData = new Map<string, Record<string, { sum: number; count: number }>>();
     
     metaAdsData.forEach((campaign) => {
-      const axisValue = String(campaign[axisKey as keyof typeof campaign] || "Unknown");
+      let axisValue = String(campaign[axisKey as keyof typeof campaign] || "Unknown");
+      
+      // If axis is date and we have time granularity, group by time period
+      if (axisKey === "date" && timeGranularity !== "none") {
+        axisValue = getTimePeriodKey(axisValue, timeGranularity);
+      }
       
       if (!aggregatedData.has(axisValue)) {
         aggregatedData.set(axisValue, {});
@@ -623,44 +655,76 @@ function DashboardContent() {
         const rawValue = campaign[valueKey as keyof typeof campaign];
         const value = typeof rawValue === "number" ? rawValue : 0;
         const fieldName = index === 0 ? "value" : `value${index + 1}`;
-        record[fieldName] = (record[fieldName] || 0) + value;
+        
+        if (!record[fieldName]) {
+          record[fieldName] = { sum: 0, count: 0 };
+        }
+        record[fieldName].sum += value;
+        record[fieldName].count += 1;
       });
     });
 
-    // Create data points with multiple value fields
+    // Create data points with multiple value fields, applying aggregation
     const newData: DataPoint[] = Array.from(aggregatedData.entries()).map(([category, values]) => {
       const dataPoint: DataPoint = {
         id: crypto.randomUUID(),
-        category: category.slice(0, 20),
-        value: Math.round((values.value || 0) * 100) / 100,
+        category: category.slice(0, 25),
+        value: 0,
       };
       
-      // Add additional value fields
-      Object.keys(values).forEach((key) => {
-        if (key !== "value") {
-          dataPoint[key] = Math.round((values[key] || 0) * 100) / 100;
+      // Apply aggregation for each value field
+      Object.keys(values).forEach((key, index) => {
+        const field = valueFields[index];
+        const aggregation = field?.aggregation || "sum";
+        const { sum, count } = values[key];
+        
+        let finalValue: number;
+        switch (aggregation) {
+          case "avg":
+            finalValue = count > 0 ? sum / count : 0;
+            break;
+          case "count":
+            finalValue = count;
+            break;
+          case "min":
+          case "max":
+            // For min/max, we'd need to track differently, but sum is reasonable default
+            finalValue = sum;
+            break;
+          default:
+            finalValue = sum;
+        }
+        
+        if (key === "value") {
+          dataPoint.value = Math.round(finalValue * 100) / 100;
+        } else {
+          dataPoint[key] = Math.round(finalValue * 100) / 100;
         }
       });
       
       return dataPoint;
     });
+    
+    // Sort by category (especially useful for time-based data)
+    newData.sort((a, b) => String(a.category).localeCompare(String(b.category)));
 
     const visual = visuals.find((v) => v.id === visualId) ||
       Array.from(slotVisuals.values()).find((v) => v.id === visualId);
 
-    // Build title from all value field names
+    // Build title from all value field names with time granularity
     const valueNames = valueFields.map(f => f.name).join(", ");
+    const timeLabel = timeGranularity !== "none" ? ` (${timeGranularity}ly)` : "";
 
     handleUpdateVisual(visualId, {
       data: newData,
       fieldMapping: mapping,
       properties: {
         ...visual?.properties!,
-        title: `${valueNames} by ${axisField.name}`,
+        title: `${valueNames} by ${axisField.name}${timeLabel}`,
       },
     });
     
-    toast.success(`Loaded ${valueFields.length} metric(s) from ${metaAdsData.length} records`);
+    toast.success(`Loaded ${valueFields.length} metric(s) from ${metaAdsData.length} records${timeGranularity !== "none" ? ` grouped by ${timeGranularity}` : ""}`);
   }, [metaAdsData, visuals, slotVisuals, handleUpdateVisual]);
 
   // Handle field mapping change for selected visual

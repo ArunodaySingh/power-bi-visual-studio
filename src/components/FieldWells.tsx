@@ -1,15 +1,16 @@
 import { useState } from "react";
 import { useDroppable } from "@dnd-kit/core";
-import { X, GripVertical, Sigma, Hash, Type } from "lucide-react";
+import { X, GripVertical, Sigma, Hash, Type, Calendar, ChevronDown, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { DataField, FieldMapping, AggregationType } from "@/types/dashboard";
+import type { DataField, FieldMapping, AggregationType, TimeGranularity } from "@/types/dashboard";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface FieldWellProps {
   label: string;
@@ -17,6 +18,7 @@ interface FieldWellProps {
   fields: DataField[];
   onRemoveField: (fieldId: string) => void;
   onAggregationChange?: (fieldId: string, aggregation: AggregationType) => void;
+  onTimeGranularityChange?: (fieldId: string, granularity: TimeGranularity) => void;
   allowMultiple?: boolean;
 }
 
@@ -26,6 +28,7 @@ function FieldWell({
   fields,
   onRemoveField,
   onAggregationChange,
+  onTimeGranularityChange,
   allowMultiple = true,
 }: FieldWellProps) {
   const { setNodeRef, isOver } = useDroppable({
@@ -60,6 +63,7 @@ function FieldWell({
                 onRemove={() => onRemoveField(field.id)}
                 showAggregation={wellType === "values"}
                 onAggregationChange={onAggregationChange}
+                onTimeGranularityChange={onTimeGranularityChange}
               />
             ))}
           </div>
@@ -70,10 +74,11 @@ function FieldWell({
 }
 
 interface FieldChipProps {
-  field: DataField & { aggregation?: AggregationType };
+  field: DataField & { aggregation?: AggregationType; timeGranularity?: TimeGranularity };
   onRemove: () => void;
   showAggregation?: boolean;
   onAggregationChange?: (fieldId: string, aggregation: AggregationType) => void;
+  onTimeGranularityChange?: (fieldId: string, granularity: TimeGranularity) => void;
 }
 
 function FieldChip({
@@ -81,9 +86,13 @@ function FieldChip({
   onRemove,
   showAggregation,
   onAggregationChange,
+  onTimeGranularityChange,
 }: FieldChipProps) {
   const [aggregation, setAggregation] = useState<AggregationType>(
     field.aggregation || "sum"
+  );
+  const [timeGranularity, setTimeGranularity] = useState<TimeGranularity>(
+    field.timeGranularity || "none"
   );
 
   const handleAggregationChange = (value: AggregationType) => {
@@ -91,13 +100,43 @@ function FieldChip({
     onAggregationChange?.(field.id, value);
   };
 
+  const handleTimeGranularityChange = (value: TimeGranularity) => {
+    setTimeGranularity(value);
+    onTimeGranularityChange?.(field.id, value);
+  };
+
   const aggregationLabels: Record<AggregationType, string> = {
+    sum: "Sum",
+    avg: "Average",
+    count: "Count",
+    min: "Min",
+    max: "Max",
+    distinctCount: "Distinct Count",
+  };
+
+  const aggregationSymbols: Record<AggregationType, string> = {
     sum: "Σ",
     avg: "μ",
     count: "#",
     min: "↓",
     max: "↑",
     distinctCount: "∑#",
+  };
+
+  const timeGranularityLabels: Record<TimeGranularity, string> = {
+    none: "No time grouping",
+    day: "by Day",
+    week: "by Week",
+    month: "by Month",
+    quarter: "by Quarter",
+    year: "by Year",
+  };
+
+  const getDisplayLabel = () => {
+    if (timeGranularity === "none") {
+      return `${aggregationSymbols[aggregation]}`;
+    }
+    return `${aggregationSymbols[aggregation]} ${timeGranularityLabels[timeGranularity]}`;
   };
 
   return (
@@ -115,24 +154,49 @@ function FieldChip({
       ) : (
         <Type className="h-3.5 w-3.5 flex-shrink-0" />
       )}
-      <span className="truncate flex-1 min-w-0 max-w-[100px]">{field.name}</span>
+      <span className="truncate min-w-0 max-w-[80px]">{field.name}</span>
       
       {showAggregation && field.type === "metric" && (
-        <Select value={aggregation} onValueChange={handleAggregationChange}>
-          <SelectTrigger className="h-6 w-10 px-1.5 text-xs border-0 bg-transparent flex-shrink-0">
-            <SelectValue>
-              <span className="font-mono">{aggregationLabels[aggregation]}</span>
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent className="min-w-[120px] bg-popover z-50">
-            <SelectItem value="sum">Sum (Σ)</SelectItem>
-            <SelectItem value="avg">Average (μ)</SelectItem>
-            <SelectItem value="count">Count (#)</SelectItem>
-            <SelectItem value="min">Min (↓)</SelectItem>
-            <SelectItem value="max">Max (↑)</SelectItem>
-            <SelectItem value="distinctCount">Distinct Count</SelectItem>
-          </SelectContent>
-        </Select>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="flex items-center gap-1 px-1.5 py-0.5 text-xs rounded hover:bg-foreground/10 transition-colors flex-shrink-0">
+              <span className="font-mono text-xs">{getDisplayLabel()}</span>
+              <ChevronDown className="h-3 w-3" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-48 bg-popover z-50">
+            <DropdownMenuLabel className="text-xs text-muted-foreground">
+              Aggregation
+            </DropdownMenuLabel>
+            {(Object.keys(aggregationLabels) as AggregationType[]).map((agg) => (
+              <DropdownMenuItem
+                key={agg}
+                onClick={() => handleAggregationChange(agg)}
+                className="flex items-center justify-between"
+              >
+                <span>{aggregationLabels[agg]} ({aggregationSymbols[agg]})</span>
+                {aggregation === agg && <Check className="h-4 w-4" />}
+              </DropdownMenuItem>
+            ))}
+            
+            <DropdownMenuSeparator />
+            
+            <DropdownMenuLabel className="text-xs text-muted-foreground flex items-center gap-1">
+              <Calendar className="h-3 w-3" />
+              Time Grouping
+            </DropdownMenuLabel>
+            {(Object.keys(timeGranularityLabels) as TimeGranularity[]).map((gran) => (
+              <DropdownMenuItem
+                key={gran}
+                onClick={() => handleTimeGranularityChange(gran)}
+                className="flex items-center justify-between"
+              >
+                <span>{gran === "none" ? "None" : timeGranularityLabels[gran].replace("by ", "")}</span>
+                {timeGranularity === gran && <Check className="h-4 w-4" />}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
       )}
       
       <button
@@ -178,6 +242,16 @@ export function FieldWells({ fieldMapping, onFieldMappingChange }: FieldWellsPro
     onFieldMappingChange(newMapping);
   };
 
+  const handleTimeGranularityChange = (fieldId: string, timeGranularity: TimeGranularity) => {
+    const newMapping = { ...fieldMapping };
+    if (newMapping.values) {
+      newMapping.values = newMapping.values.map((f) =>
+        f.id === fieldId ? { ...f, timeGranularity } : f
+      ) as DataField[];
+    }
+    onFieldMappingChange(newMapping);
+  };
+
   return (
     <div className="space-y-4 overflow-hidden">
       <div className="flex items-center gap-2 pb-3 border-b">
@@ -200,6 +274,7 @@ export function FieldWells({ fieldMapping, onFieldMappingChange }: FieldWellsPro
         fields={fieldMapping.values || []}
         onRemoveField={(id) => handleRemoveField("values", id)}
         onAggregationChange={handleAggregationChange}
+        onTimeGranularityChange={handleTimeGranularityChange}
       />
 
       <FieldWell

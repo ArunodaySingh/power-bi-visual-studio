@@ -29,12 +29,15 @@ export interface SlicerData {
   showSearch?: boolean;
 }
 
+export type TimeGranularity = "none" | "day" | "week" | "month" | "quarter" | "year";
+
 export interface DataField {
   id: string;
   name: string;
   type: "metric" | "dimension";
   format?: string;
   aggregation?: AggregationType;
+  timeGranularity?: TimeGranularity;
 }
 
 export interface FieldMapping {
