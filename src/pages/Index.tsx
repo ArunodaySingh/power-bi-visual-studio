@@ -17,20 +17,20 @@
 import { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 
-// UI Icons
-import { Settings, LayoutGrid, Loader2, Database, RefreshCw, AlertCircle, Save, ArrowLeft, LogOut, Filter, Hash, Type } from "lucide-react";
+// UI Icons - Only import what's needed for the current UI
+import { Settings, LayoutGrid, Loader2, Database, RefreshCw, AlertCircle, Save, ArrowLeft, LogOut, Filter } from "lucide-react";
 
 // Drag and drop functionality
 import { DndContext, DragEndEvent, DragStartEvent, useSensor, useSensors, PointerSensor, DragOverlay } from "@dnd-kit/core";
 
 // Dashboard components
-import { VisualTypeSelector, type VisualType } from "@/components/VisualTypeSelector";
+import { type VisualType } from "@/components/VisualTypeSelector";
 import { PropertyPanel, type VisualProperties } from "@/components/PropertyPanel";
 import type { DataPoint } from "@/components/DataEditor";
 import { PanelCanvas } from "@/components/PanelCanvas";
 import { CodeExport } from "@/components/CodeExport";
 import { SheetTabs } from "@/components/SheetTabs";
-import { DataFieldsPanel, metaAdsDataTables, type DataField, type DataTable } from "@/components/DataFieldsPanel";
+// DataFieldsPanel removed - using dropdown configuration instead
 import { ComponentPalette } from "@/components/ComponentPalette";
 import { ChartConfigDropdowns, type ChartConfig } from "@/components/ChartConfigDropdowns";
 import { type LayoutType } from "@/components/LayoutPalette";
@@ -54,7 +54,7 @@ import { useMetaAdsData, getUniqueValues } from "@/hooks/useMetaAdsData";
 import { DropdownSlicer, ListSlicer, DateRangeSlicer, NumericRangeSlicer } from "@/components/slicers";
 
 // Types
-import type { SlicerType, SlicerData, FieldMapping, TimeGranularity } from "@/types/dashboard";
+import type { SlicerType, SlicerData, TimeGranularity } from "@/types/dashboard";
 
 // Utilities
 import { toast } from "sonner";
@@ -250,9 +250,7 @@ function DashboardContent() {
   // Drag state - tracks what type of element is being dragged
   const [isLayoutDragging, setIsLayoutDragging] = useState(false);
   const [isComponentDragging, setIsComponentDragging] = useState(false);
-  const [isFieldDragging, setIsFieldDragging] = useState(false);
   const [isSlicerDragging, setIsSlicerDragging] = useState(false);
-  const [draggingField, setDraggingField] = useState<DataField | null>(null);
   const [draggingLayout, setDraggingLayout] = useState<LayoutType | null>(null);
   const [draggingComponent, setDraggingComponent] = useState<string | null>(null);
   const [draggingSlicerType, setDraggingSlicerType] = useState<SlicerType | null>(null);
@@ -613,70 +611,7 @@ function DashboardContent() {
     if (selectedVisualId) handleUpdateVisual(selectedVisualId, { properties });
   };
 
-  // Handle field dropped onto visual - fetch from database
-  const handleFieldDropped = useCallback((visualId: string, field: DataField) => {
-    if (metaAdsData.length === 0) {
-      toast.error("No data available. Please wait for data to load.");
-      return;
-    }
-
-    // Map database field names to match field IDs
-    const fieldKeyMap: Record<string, string> = {
-      campaign_name: "campaign_name",
-      ad_set_name: "ad_set_name",
-      date: "date",
-      impressions: "impressions",
-      clicks: "clicks",
-      spend: "spend",
-      conversions: "conversions",
-      ctr: "ctr",
-      cpc: "cpc",
-      cpm: "cpm",
-      roas: "roas",
-    };
-
-    const dbFieldKey = fieldKeyMap[field.id] || field.id;
-    
-    // Aggregate data by campaign name
-    const aggregatedData = new Map<string, number>();
-    metaAdsData.forEach((campaign) => {
-      const campaignName = campaign.campaign_name || "Unknown";
-      const rawValue = campaign[dbFieldKey as keyof typeof campaign];
-      const value = typeof rawValue === "number" ? rawValue : 0;
-      
-      aggregatedData.set(
-        campaignName,
-        (aggregatedData.get(campaignName) || 0) + value
-      );
-    });
-
-    const newData: DataPoint[] = Array.from(aggregatedData.entries()).map(([category, value]) => ({
-      id: crypto.randomUUID(),
-      category: category.slice(0, 20),
-      value: Math.round(value * 100) / 100,
-    }));
-
-    const visual = visuals.find((v) => v.id === visualId) ||
-      Array.from(slotVisuals.values()).find((v) => v.id === visualId);
-
-    handleUpdateVisual(visualId, {
-      data: newData,
-      properties: {
-        ...visual?.properties!,
-        title: field.name + " by Campaign",
-      },
-    });
-
-    toast.success(`Loaded "${field.name}" from database (${metaAdsData.length} records)`);
-  }, [handleUpdateVisual, visuals, slotVisuals, metaAdsData]);
-
-  // Get data tables for current sheet
-  const getCurrentDataTables = (): DataTable[] => {
-    if (activeSheet?.name === "Meta Ads") {
-      return metaAdsDataTables;
-    }
-    return [];
-  };
+  // Field-drop handler removed - using dropdown configuration instead
 
   // Get available values for slicer field from database
   const getSlicerValues = (field: string): (string | number)[] => {
@@ -730,139 +665,7 @@ function DashboardContent() {
     }
   }, []);
 
-  // Transform data based on field mapping - supports multiple value fields and time granularity
-  const transformDataFromFieldMapping = useCallback((visualId: string, mapping: FieldMapping) => {
-    if (metaAdsData.length === 0) return;
-
-    const axisField = mapping.axis?.[0];
-    const valueFields = mapping.values || [];
-    
-    if (!axisField || valueFields.length === 0) return;
-
-    // Map field IDs to database column names
-    const fieldKeyMap: Record<string, string> = {
-      campaign_name: "campaign_name",
-      ad_set_name: "ad_set_name",
-      date: "date",
-      impressions: "impressions",
-      clicks: "clicks",
-      spend: "spend",
-      conversions: "conversions",
-      ctr: "ctr",
-      cpc: "cpc",
-      cpm: "cpm",
-      roas: "roas",
-    };
-
-    const axisKey = fieldKeyMap[axisField.id] || axisField.id;
-    
-    // Get the time granularity from the first value field (or use none)
-    const timeGranularity = valueFields[0]?.timeGranularity || "none";
-
-    // Aggregate data by axis field (with time period if applicable) for all value fields
-    const aggregatedData = new Map<string, Record<string, { sum: number; count: number }>>();
-    
-    metaAdsData.forEach((campaign) => {
-      let axisValue = String(campaign[axisKey as keyof typeof campaign] || "Unknown");
-      
-      // If axis is date and we have time granularity, group by time period
-      if (axisKey === "date" && timeGranularity !== "none") {
-        axisValue = getTimePeriodKey(axisValue, timeGranularity);
-      }
-      
-      if (!aggregatedData.has(axisValue)) {
-        aggregatedData.set(axisValue, {});
-      }
-      
-      const record = aggregatedData.get(axisValue)!;
-      
-      valueFields.forEach((field, index) => {
-        const valueKey = fieldKeyMap[field.id] || field.id;
-        const rawValue = campaign[valueKey as keyof typeof campaign];
-        const value = typeof rawValue === "number" ? rawValue : 0;
-        const fieldName = index === 0 ? "value" : `value${index + 1}`;
-        
-        if (!record[fieldName]) {
-          record[fieldName] = { sum: 0, count: 0 };
-        }
-        record[fieldName].sum += value;
-        record[fieldName].count += 1;
-      });
-    });
-
-    // Create data points with multiple value fields, applying aggregation
-    const newData: DataPoint[] = Array.from(aggregatedData.entries()).map(([category, values]) => {
-      const dataPoint: DataPoint = {
-        id: crypto.randomUUID(),
-        category: category.slice(0, 25),
-        value: 0,
-      };
-      
-      // Apply aggregation for each value field
-      Object.keys(values).forEach((key, index) => {
-        const field = valueFields[index];
-        const aggregation = field?.aggregation || "sum";
-        const { sum, count } = values[key];
-        
-        let finalValue: number;
-        switch (aggregation) {
-          case "avg":
-            finalValue = count > 0 ? sum / count : 0;
-            break;
-          case "count":
-            finalValue = count;
-            break;
-          case "min":
-          case "max":
-            // For min/max, we'd need to track differently, but sum is reasonable default
-            finalValue = sum;
-            break;
-          default:
-            finalValue = sum;
-        }
-        
-        if (key === "value") {
-          dataPoint.value = Math.round(finalValue * 100) / 100;
-        } else {
-          dataPoint[key] = Math.round(finalValue * 100) / 100;
-        }
-      });
-      
-      return dataPoint;
-    });
-    
-    // Sort by category (especially useful for time-based data)
-    newData.sort((a, b) => String(a.category).localeCompare(String(b.category)));
-
-    const visual = visuals.find((v) => v.id === visualId) ||
-      Array.from(slotVisuals.values()).find((v) => v.id === visualId);
-
-    // Build title from all value field names with time granularity
-    const valueNames = valueFields.map(f => f.name).join(", ");
-    const timeLabel = timeGranularity !== "none" ? ` (${timeGranularity}ly)` : "";
-
-    handleUpdateVisual(visualId, {
-      data: newData,
-      fieldMapping: mapping,
-      properties: {
-        ...visual?.properties!,
-        title: `${valueNames} by ${axisField.name}${timeLabel}`,
-      },
-    });
-    
-    toast.success(`Loaded ${valueFields.length} metric(s) from ${metaAdsData.length} records${timeGranularity !== "none" ? ` grouped by ${timeGranularity}` : ""}`);
-  }, [metaAdsData, visuals, slotVisuals, handleUpdateVisual]);
-
-  // Handle field mapping change for selected visual
-  const handleFieldMappingChange = useCallback((mapping: FieldMapping) => {
-    if (selectedVisualId) {
-      handleUpdateVisual(selectedVisualId, { fieldMapping: mapping });
-      // Also transform data if we have axis and values
-      if (mapping.axis?.length && mapping.values?.length) {
-        transformDataFromFieldMapping(selectedVisualId, mapping);
-      }
-    }
-  }, [selectedVisualId, handleUpdateVisual, transformDataFromFieldMapping]);
+  // Field mapping handlers removed - using dropdown configuration instead
 
   // ========== CHART CONFIG HANDLER ==========
   /**
@@ -964,19 +767,18 @@ function DashboardContent() {
     const id = active.id as string;
     const data = active.data.current;
 
+    // Set dragging state based on element type
     if (id.startsWith("layout-")) {
       setIsLayoutDragging(true);
       setDraggingLayout(data?.layout?.type || null);
     } else if (id.startsWith("component-")) {
       setIsComponentDragging(true);
       setDraggingComponent(data?.componentType || null);
-    } else if (id.startsWith("field-")) {
-      setIsFieldDragging(true);
-      setDraggingField(data?.field || null);
     } else if (id.startsWith("slicer-type-")) {
       setIsSlicerDragging(true);
       setDraggingSlicerType(data?.slicerType || null);
     }
+    // Note: field dragging removed - using dropdown config instead
   };
 
   // Handle drag end
@@ -988,11 +790,9 @@ function DashboardContent() {
     // Reset all dragging states
     setIsLayoutDragging(false);
     setIsComponentDragging(false);
-    setIsFieldDragging(false);
     setIsSlicerDragging(false);
     setDraggingLayout(null);
     setDraggingComponent(null);
-    setDraggingField(null);
     setDraggingSlicerType(null);
 
     // Handle layout drop on canvas
@@ -1036,64 +836,7 @@ function DashboardContent() {
       return;
     }
 
-    // Handle field drop onto visual
-    if (activeId.startsWith("field-") && over) {
-      const overId = over.id as string;
-      const fieldData = activeData?.field as DataField | undefined;
-      
-      if (fieldData) {
-        // Handle drop on Field Well
-        if (overId.startsWith("well-")) {
-          const wellType = overId.replace("well-", "") as keyof FieldMapping;
-          if (selectedVisual) {
-            const currentMapping = selectedVisual.fieldMapping || { axis: [], values: [], tooltips: [] };
-            const newMapping = { ...currentMapping };
-            
-            if (wellType === "legend") {
-              newMapping.legend = fieldData;
-            } else {
-              const existingFields = (newMapping[wellType] as DataField[]) || [];
-              if (!existingFields.some(f => f.id === fieldData.id)) {
-                newMapping[wellType] = [...existingFields, fieldData] as never;
-              }
-            }
-            
-            handleFieldMappingChange(newMapping);
-            toast.success(`Added ${fieldData.name} to ${wellType}`);
-          } else {
-            toast.error("Select a visual first to add fields");
-          }
-          return;
-        }
-        
-        // Handle drop on standalone visual
-        if (overId.startsWith("drop-")) {
-          const visualId = overId.replace("drop-", "");
-          handleFieldDropped(visualId, fieldData);
-          return;
-        }
-        
-        // Handle drop on visual-drop zone (from VisualDropZone)
-        if (overId.startsWith("visual-drop-")) {
-          const visualId = overId.replace("visual-drop-", "");
-          handleFieldDropped(visualId, fieldData);
-          return;
-        }
-        
-        // Handle drop on slot that has a visual
-        if (overId.startsWith("slot-")) {
-          const overData = over.data.current;
-          if (overData?.slotId) {
-            const visual = slotVisuals.get(overData.slotId);
-            if (visual) {
-              handleFieldDropped(visual.id, fieldData);
-              return;
-            }
-          }
-        }
-      }
-      return;
-    }
+    // Field dropping removed - using dropdown configuration instead
 
     // Handle slicer drag
     if (activeId.startsWith("slicer-") && !activeId.startsWith("slicer-type-")) {
@@ -1330,7 +1073,7 @@ function DashboardContent() {
                 selectedPanelId={selectedPanelId}
                 selectedVisualId={selectedVisualId}
                 isLayoutDragging={isLayoutDragging || isSlicerDragging}
-                isFieldDragging={isFieldDragging}
+                isFieldDragging={false}
                 isComponentDragging={isComponentDragging}
                 crossFilterVisualId={crossFilter?.sourceVisualId || null}
                 highlightedValue={crossFilter?.value || null}
@@ -1360,10 +1103,7 @@ function DashboardContent() {
           {/* Right Sidebar - Data Fields & Config */}
           {showConfigPanel && (
             <aside className="w-80 border-l bg-card flex flex-col overflow-hidden">
-              {/* Data Fields - Always visible at top */}
-              <div className="h-64 border-b flex-shrink-0 overflow-hidden">
-                <DataFieldsPanel tables={getCurrentDataTables()} />
-              </div>
+              {/* Data Fields panel removed - using dropdown configuration */}
               
               {/* Tabs for Visual/Format */}
               <Tabs defaultValue="visual" className="flex-1 flex flex-col overflow-hidden">
@@ -1463,16 +1203,7 @@ function DashboardContent() {
             <span className="capitalize">{draggingSlicerType.replace("-", " ")} Slicer</span>
           </div>
         )}
-        {draggingField && (
-          <div className="flex items-center gap-2 px-3 py-2 bg-card border rounded-lg shadow-lg text-sm font-medium">
-            {draggingField.type === "metric" ? (
-              <Hash className="h-4 w-4 text-primary" />
-            ) : (
-              <Type className="h-4 w-4 text-muted-foreground" />
-            )}
-            {draggingField.name}
-          </div>
-        )}
+        {/* Field drag overlay removed - using dropdown configuration */}
       </DragOverlay>
 
       {/* Save Dashboard Dialog */}
