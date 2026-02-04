@@ -18,7 +18,7 @@ import { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 
 // UI Icons - Only import what's needed for the current UI
-import { Settings, LayoutGrid, Loader2, Database, RefreshCw, AlertCircle, Save, ArrowLeft, LogOut, Filter } from "lucide-react";
+import { Settings, LayoutGrid, Loader2, Database, RefreshCw, AlertCircle, Save, ArrowLeft, LogOut, Filter, Type } from "lucide-react";
 
 // Drag and drop functionality
 import { DndContext, DragEndEvent, DragStartEvent, useSensor, useSensors, PointerSensor, DragOverlay } from "@dnd-kit/core";
@@ -37,6 +37,7 @@ import { type LayoutType } from "@/components/LayoutPalette";
 import { type PanelData, generateSlots } from "@/components/DraggablePanel";
 import type { CanvasVisualData } from "@/components/CanvasVisual";
 import type { VisualizationType } from "@/components/VisualizationSelector";
+import { TextContainer, type TextContainerData } from "@/components/TextContainer";
 
 // UI components
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -52,6 +53,7 @@ import { useMetaAdsData, getUniqueValues } from "@/hooks/useMetaAdsData";
 
 // Slicer components
 import { DropdownSlicer, ListSlicer, DateRangeSlicer, NumericRangeSlicer } from "@/components/slicers";
+import { SlicerSettingsPanel } from "@/components/SlicerSettingsPanel";
 
 // Types
 import type { SlicerType, SlicerData, TimeGranularity } from "@/types/dashboard";
@@ -79,6 +81,7 @@ interface SheetData {
   visuals: CanvasVisualData[];       // Standalone visuals (not in panels)
   slotVisuals: SlotVisualsMap;       // Visuals placed inside panel slots
   slicers: SlicerData[];             // Filter slicers on this sheet
+  textContainers: TextContainerData[]; // Text headers and logos
 }
 
 // ============================================================================
@@ -178,6 +181,25 @@ const createEmptySheet = (name: string): SheetData => ({
   visuals: [],
   slotVisuals: new Map(),
   slicers: [],
+  textContainers: [],
+});
+
+/**
+ * Creates a new text container
+ * @param type - "text" or "logo"
+ * @param index - Position index for auto-layout
+ */
+const createNewTextContainer = (type: "text" | "logo", index: number): TextContainerData => ({
+  id: crypto.randomUUID(),
+  type,
+  content: type === "text" ? "Dashboard Title" : "",
+  position: { x: 0, y: 0 },
+  size: { width: 400, height: 80 },
+  fontSize: type === "text" ? 24 : 16,
+  fontWeight: "bold",
+  textAlign: "center",
+  snapToTop: true,
+  matchWidth: true,
 });
 
 /**
@@ -190,9 +212,11 @@ const getDefaultSlicerField = (type: SlicerType): { field: string; label: string
     case "date-range":
       return { field: "date", label: "Date" };
     case "numeric-range":
-      return { field: "spend", label: "Spend" };
+      return { field: "Spend", label: "Spend" };
+    case "dropdown":
+    case "list":
     default:
-      return { field: "campaignName", label: "Campaign" };
+      return { field: "Campaign Name", label: "Campaign Name" };
   }
 };
 
@@ -246,14 +270,17 @@ function DashboardContent() {
   const [selectedPanelId, setSelectedPanelId] = useState<string | null>(null);
   const [selectedVisualId, setSelectedVisualId] = useState<string | null>(null);
   const [selectedSlicerId, setSelectedSlicerId] = useState<string | null>(null);
+  const [selectedTextContainerId, setSelectedTextContainerId] = useState<string | null>(null);
   
   // Drag state - tracks what type of element is being dragged
   const [isLayoutDragging, setIsLayoutDragging] = useState(false);
   const [isComponentDragging, setIsComponentDragging] = useState(false);
   const [isSlicerDragging, setIsSlicerDragging] = useState(false);
+  const [isTextDragging, setIsTextDragging] = useState(false);
   const [draggingLayout, setDraggingLayout] = useState<LayoutType | null>(null);
   const [draggingComponent, setDraggingComponent] = useState<string | null>(null);
   const [draggingSlicerType, setDraggingSlicerType] = useState<SlicerType | null>(null);
+  const [draggingTextType, setDraggingTextType] = useState<"text" | "logo" | null>(null);
   
   // Panel visibility state
   const [showConfigPanel, setShowConfigPanel] = useState(true);
@@ -279,12 +306,14 @@ function DashboardContent() {
   const visuals = activeSheet?.visuals || [];
   const slotVisuals = activeSheet?.slotVisuals || new Map<string, CanvasVisualData>();
   const slicers = activeSheet?.slicers || [];
+  const textContainers = activeSheet?.textContainers || [];
   
   // Find selected elements
   const selectedVisual = visuals.find((v) => v.id === selectedVisualId) || 
     Array.from(slotVisuals.values()).find((v) => v.id === selectedVisualId);
   const selectedPanel = panels.find((p) => p.id === selectedPanelId);
   const selectedSlicer = slicers.find((s) => s.id === selectedSlicerId);
+  const selectedTextContainer = textContainers.find((t) => t.id === selectedTextContainerId);
 
   // Configure drag sensors - requires 5px movement to start drag
   const sensors = useSensors(
@@ -469,6 +498,43 @@ function DashboardContent() {
     setSelectedSlicerId((prev) => (prev === id ? null : prev));
   }, [activeSheetId, slicers, removeFilter]);
 
+  // Text container handlers
+  const handleAddTextContainer = useCallback((type: "text" | "logo", position?: { x: number; y: number }) => {
+    const newContainer = createNewTextContainer(type, textContainers.length);
+    if (position) {
+      newContainer.position = position;
+    }
+    setSheets((prev) =>
+      prev.map((s) =>
+        s.id === activeSheetId ? { ...s, textContainers: [...s.textContainers, newContainer] } : s
+      )
+    );
+    setSelectedTextContainerId(newContainer.id);
+    setSelectedPanelId(null);
+    setSelectedVisualId(null);
+    setSelectedSlicerId(null);
+    toast.success(`Added ${type === "text" ? "text header" : "logo"}`);
+  }, [textContainers.length, activeSheetId]);
+
+  const handleUpdateTextContainer = useCallback((id: string, updates: Partial<TextContainerData>) => {
+    setSheets((prev) =>
+      prev.map((s) =>
+        s.id === activeSheetId
+          ? { ...s, textContainers: s.textContainers.map((t) => (t.id === id ? { ...t, ...updates } : t)) }
+          : s
+      )
+    );
+  }, [activeSheetId]);
+
+  const handleDeleteTextContainer = useCallback((id: string) => {
+    setSheets((prev) =>
+      prev.map((s) =>
+        s.id === activeSheetId ? { ...s, textContainers: s.textContainers.filter((t) => t.id !== id) } : s
+      )
+    );
+    setSelectedTextContainerId((prev) => (prev === id ? null : prev));
+  }, [activeSheetId]);
+
   // Visual to slot handlers
   const handleAddVisualToSlot = useCallback((panelId: string, slotId: string, type: VisualizationType) => {
     const visualType = (type || "bar") as VisualType;
@@ -616,7 +682,10 @@ function DashboardContent() {
   // Get available values for slicer field from database
   const getSlicerValues = (field: string): (string | number)[] => {
     if (metaAdsData.length === 0) return [];
+    
+    // Map slicer field names to database column names
     const fieldKeyMap: Record<string, keyof typeof metaAdsData[0]> = {
+      // Legacy field names
       campaignName: "campaign_name",
       adSetName: "ad_set_name",
       date: "date",
@@ -628,7 +697,33 @@ function DashboardContent() {
       cpc: "cpc",
       cpm: "cpm",
       roas: "roas",
+      // Group By dimensions
+      "Campaign Name": "campaign_name",
+      "Ad Set Name": "ad_set_name",
+      "Platform": "campaign_name", // Placeholder - using campaign_name as proxy
+      "Campaign Category": "campaign_name",
+      "Ad Category": "campaign_name",
+      "Ad Format": "campaign_name",
+      "Ad Name": "campaign_name",
+      "Ad Set Label": "ad_set_name",
+      "Ad Set Type": "ad_set_name",
+      "Ad Type": "campaign_name",
+      "Age": "campaign_name",
+      "Campaign Label": "campaign_name",
+      "Campaign Type": "campaign_name",
+      "Device": "campaign_name",
+      "Gender": "campaign_name",
+      // Measures (for numeric range)
+      "Clicks": "clicks",
+      "Spend": "spend",
+      "Impressions": "impressions",
+      "CTR": "ctr",
+      "CPC": "cpc",
+      "CPM": "cpm",
+      "Conversions": "conversions",
+      "ROAS": "roas",
     };
+    
     const dbField = fieldKeyMap[field] || field as keyof typeof metaAdsData[0];
     return getUniqueValues(metaAdsData, dbField);
   };
@@ -777,6 +872,9 @@ function DashboardContent() {
     } else if (id.startsWith("slicer-type-")) {
       setIsSlicerDragging(true);
       setDraggingSlicerType(data?.slicerType || null);
+    } else if (id.startsWith("text-type-")) {
+      setIsTextDragging(true);
+      setDraggingTextType(data?.textType || null);
     }
     // Note: field dragging removed - using dropdown config instead
   };
@@ -791,9 +889,11 @@ function DashboardContent() {
     setIsLayoutDragging(false);
     setIsComponentDragging(false);
     setIsSlicerDragging(false);
+    setIsTextDragging(false);
     setDraggingLayout(null);
     setDraggingComponent(null);
     setDraggingSlicerType(null);
+    setDraggingTextType(null);
 
     // Handle layout drop on canvas
     if (activeId.startsWith("layout-") && over) {
@@ -832,6 +932,33 @@ function DashboardContent() {
         if (overData?.type === "slot" && overData.panelId && overData.slotId) {
           handleAddVisualToSlot(overData.panelId, overData.slotId, componentType);
         }
+      }
+      return;
+    }
+
+    // Handle text container type drop on canvas
+    if (activeId.startsWith("text-type-") && over) {
+      const overId = over.id as string;
+      if (overId === "canvas-drop" || !overId.startsWith("slot-") && !overId.startsWith("drop-") && !overId.startsWith("visual-")) {
+        const textType = activeData?.textType as "text" | "logo";
+        if (textType) {
+          handleAddTextContainer(textType, { x: 0, y: 0 });
+        }
+      }
+      return;
+    }
+
+    // Handle text container drag (move)
+    if (activeId.startsWith("text-") && !activeId.startsWith("text-type-")) {
+      const containerId = activeId.replace("text-", "");
+      const container = textContainers.find((t) => t.id === containerId);
+      if (container && !container.snapToTop && !container.matchWidth) {
+        handleUpdateTextContainer(containerId, {
+          position: {
+            x: container.position.x + delta.x,
+            y: container.position.y + delta.y,
+          },
+        });
       }
       return;
     }
@@ -892,6 +1019,7 @@ function DashboardContent() {
                 onAddSlicer={handleAddSlicer}
                 onChangeVisualType={handleTypeChange}
                 selectedVisualType={selectedVisual?.type || null}
+                onAddTextContainer={handleAddTextContainer}
               />
             </aside>
           )}
@@ -995,8 +1123,26 @@ function DashboardContent() {
               </div>
             </div>
 
-            {/* Canvas with Slicers */}
+            {/* Canvas with Slicers and Text Containers */}
             <div className="flex-1 p-4 bg-muted/30 canvas-grid overflow-auto relative">
+              {/* Render Text Containers */}
+              {textContainers.map((container) => (
+                <TextContainer
+                  key={container.id}
+                  container={container}
+                  isSelected={selectedTextContainerId === container.id}
+                  canvasWidth={800}
+                  onSelect={() => {
+                    setSelectedTextContainerId(container.id);
+                    setSelectedPanelId(null);
+                    setSelectedVisualId(null);
+                    setSelectedSlicerId(null);
+                  }}
+                  onUpdate={(updates) => handleUpdateTextContainer(container.id, updates)}
+                  onDelete={() => handleDeleteTextContainer(container.id)}
+                />
+              ))}
+
               {/* Render Slicers */}
               {slicers.map((slicer) => {
                 const slicerProps = {
@@ -1143,25 +1289,10 @@ function DashboardContent() {
                         </div>
                       </div>
                     ) : selectedSlicer ? (
-                      <div className="space-y-3">
-                        <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                          Slicer Settings
-                        </h3>
-                        <div className="text-sm">
-                          <span className="text-muted-foreground">Type: </span>
-                          <span className="capitalize">{selectedSlicer.type.replace("-", " ")}</span>
-                        </div>
-                        <div className="text-sm">
-                          <span className="text-muted-foreground">Field: </span>
-                          <span>{selectedSlicer.fieldLabel}</span>
-                        </div>
-                        {selectedSlicer.selectedValues.length > 0 && (
-                          <div className="text-sm">
-                            <span className="text-muted-foreground">Selected: </span>
-                            <span>{selectedSlicer.selectedValues.length} value(s)</span>
-                          </div>
-                        )}
-                      </div>
+                      <SlicerSettingsPanel 
+                        slicer={selectedSlicer} 
+                        onUpdate={(updates) => handleUpdateSlicer(selectedSlicer.id, updates)} 
+                      />
                     ) : (
                       <div className="text-sm text-muted-foreground text-center py-8">
                         Select a visual, panel, or slicer to edit
@@ -1203,6 +1334,12 @@ function DashboardContent() {
           <div className="flex items-center gap-2 px-4 py-3 bg-card border rounded-lg shadow-lg text-sm font-medium">
             <Filter className="h-4 w-4 text-primary" />
             <span className="capitalize">{draggingSlicerType.replace("-", " ")} Slicer</span>
+          </div>
+        )}
+        {draggingTextType && (
+          <div className="flex items-center gap-2 px-4 py-3 bg-card border rounded-lg shadow-lg text-sm font-medium">
+            <Type className="h-4 w-4 text-primary" />
+            <span className="capitalize">{draggingTextType === "text" ? "Text Header" : "Logo"}</span>
           </div>
         )}
         {/* Field drag overlay removed - using dropdown configuration */}

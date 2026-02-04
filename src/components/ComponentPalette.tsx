@@ -14,7 +14,9 @@ import {
   Triangle,
   CircleDot,
   Layers,
-  LayoutGrid
+  LayoutGrid,
+  Type,
+  Image
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "./ui/scroll-area";
@@ -61,6 +63,17 @@ const slicerOptions: SlicerOption[] = [
   { type: "list", icon: ListFilter, label: "List" },
   { type: "date-range", icon: Calendar, label: "Date Range" },
   { type: "numeric-range", icon: SlidersHorizontal, label: "Numeric Range" },
+];
+
+interface TextContainerOption {
+  type: "text" | "logo";
+  icon: React.ElementType;
+  label: string;
+}
+
+const textContainerOptions: TextContainerOption[] = [
+  { type: "text", icon: Type, label: "Text Header" },
+  { type: "logo", icon: Image, label: "Logo" },
 ];
 
 interface DraggableComponentItemProps {
@@ -161,18 +174,55 @@ function DraggableSlicerItem({ slicer }: DraggableSlicerItemProps) {
   );
 }
 
+interface DraggableTextItemProps {
+  item: TextContainerOption;
+}
+
+function DraggableTextItem({ item }: DraggableTextItemProps) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: `text-type-${item.type}`,
+    data: { type: "text-type", textType: item.type },
+  });
+
+  const style = {
+    transform: CSS.Translate.toString(transform),
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...listeners}
+      {...attributes}
+      className={cn(
+        "flex flex-col items-center justify-center gap-2 p-3 rounded-lg border-2 border-transparent min-h-[72px]",
+        "bg-secondary/50 hover:bg-secondary hover:border-border transition-all",
+        "cursor-grab active:cursor-grabbing group overflow-hidden",
+        isDragging && "opacity-50 ring-2 ring-primary"
+      )}
+    >
+      <item.icon className="h-5 w-5 text-muted-foreground group-hover:text-foreground transition-colors flex-shrink-0" />
+      <span className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition-colors text-center truncate w-full">
+        {item.label}
+      </span>
+    </div>
+  );
+}
+
 interface ComponentPaletteProps {
   onAddVisual: (type: VisualizationType) => void;
   onChangeVisualType?: (type: VisualizationType) => void;
   selectedVisualType?: VisualizationType | null;
   onAddSlicer?: (type: SlicerType) => void;
+  onAddTextContainer?: (type: "text" | "logo") => void;
 }
 
 export function ComponentPalette({ 
   onAddVisual, 
   onChangeVisualType, 
   selectedVisualType,
-  onAddSlicer 
+  onAddSlicer,
+  onAddTextContainer 
 }: ComponentPaletteProps) {
   const charts = componentOptions.filter((c) => c.category === "charts");
   const tables = componentOptions.filter((c) => c.category === "tables");
@@ -220,7 +270,22 @@ export function ComponentPalette({
       
       <ScrollArea className="flex-1">
         <div className="p-4 space-y-6">
-          {/* Filters Section - First */}
+          {/* Text / Headers Section - First */}
+          <div className="space-y-3 bg-background p-3 rounded-lg border">
+            <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider px-1">
+              Text & Headers
+            </h3>
+            <p className="text-sm text-muted-foreground px-1 mb-2">
+              Labels, titles, and logos
+            </p>
+            <div className="grid grid-cols-2 gap-2.5">
+              {textContainerOptions.map((item) => (
+                <DraggableTextItem key={item.type} item={item} />
+              ))}
+            </div>
+          </div>
+          
+          {/* Filters Section */}
           <div className="space-y-3 bg-background p-3 rounded-lg border">
             <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider px-1">
               Filters / Slicers
@@ -235,17 +300,17 @@ export function ComponentPalette({
             </div>
           </div>
           
-          {/* KPI Cards Section - Second (renamed from "Cards") */}
+          {/* KPI Cards Section */}
           <div className="border-t pt-4">
             {renderSection("KPI Cards", cards)}
           </div>
           
-          {/* Tables Section - Third */}
+          {/* Tables Section */}
           <div className="border-t pt-4">
             {renderSection("Tables", tables)}
           </div>
           
-          {/* Charts Section - Fourth */}
+          {/* Charts Section */}
           <div className="border-t pt-4">
             {renderSection("Charts", charts, "Drag to panel or canvas")}
           </div>
