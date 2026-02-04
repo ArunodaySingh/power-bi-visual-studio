@@ -15,14 +15,10 @@
 - **Data Label Options**: Position (top/inside/outside/center) and format (value/percent/both)
 - **Show Totals Toggle**: Table visual totals row in Format panel
 - **Matrix Visual**: Row/Column fields (Group By dimensions), Values (Measures)
+- **Grid Lock**: 16px snap-to-grid alignment for visuals, panels, slicers (toggle in toolbar)
+- **Auto-Expand**: Visuals automatically expand to fill available space when dropped (toggle in toolbar)
 
-## 🔲 TBD - Pending Features
-
-### UI/UX Enhancements
-| Feature | Description | Status |
-|---------|-------------|--------|
-| Grid Lock | Snap-to-grid alignment for visuals | TBD |
-| Expand on Drag | Visual expands to fill area where dragged | TBD |
+## 🔲 TBD - Future Enhancements
 
 ### Visual Configuration
 | Feature | Description | Status |
@@ -33,7 +29,7 @@
 ### Chart Types
 | Feature | Description | Status |
 |---------|-------------|--------|
-| Gauge Chart | Fix gauge functionality | TBD (Gauge removed - not supported by recharts) |
+| Gauge Chart | Gauge visualization | Note: Not supported by recharts library |
 
 ### Advanced Charts (Disabled)
 These charts are currently disabled pending functionality discussion:
@@ -47,7 +43,13 @@ These charts are currently disabled pending functionality discussion:
 ## Implementation Notes
 
 ### Grid Lock System
-Consider 8px or 16px grid for snap alignment.
+- Uses 16px grid for snap alignment
+- Toggle button in toolbar shows grid overlay when enabled
+- All drag operations (visuals, panels, slicers, text) snap to grid
+- Resize operations also snap to grid
 
-### Expand on Drag
-Implement collision detection to expand visual to available space.
+### Auto-Expand Feature
+- When enabled, new visuals expand to fill available horizontal and vertical space
+- Collision detection prevents overlapping with existing visuals
+- Minimum size: 400x300px
+- Respects canvas boundaries with margin

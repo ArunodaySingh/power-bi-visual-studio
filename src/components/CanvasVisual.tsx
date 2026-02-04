@@ -27,6 +27,7 @@ interface CanvasVisualProps {
   isFieldDragging?: boolean;
   isCrossFiltered?: boolean;
   highlightedValue?: string | string[] | null;
+  gridSize?: number;
   onSelect: () => void;
   onUpdate: (updates: Partial<CanvasVisualData>) => void;
   onDelete: () => void;
@@ -40,6 +41,7 @@ export function CanvasVisual({
   isFieldDragging,
   isCrossFiltered,
   highlightedValue,
+  gridSize = 16,
   onSelect,
   onUpdate,
   onDelete,
@@ -66,6 +68,11 @@ export function CanvasVisual({
     height: visual.size.height,
   };
 
+  // Snap to grid helper
+  const snapToGrid = (value: number): number => {
+    return Math.round(value / gridSize) * gridSize;
+  };
+
   const handleResizeStart = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -77,8 +84,8 @@ export function CanvasVisual({
     const startHeight = visual.size.height;
 
     const handleMouseMove = (moveEvent: MouseEvent) => {
-      const newWidth = Math.max(300, startWidth + (moveEvent.clientX - startX));
-      const newHeight = Math.max(250, startHeight + (moveEvent.clientY - startY));
+      const newWidth = Math.max(300, snapToGrid(startWidth + (moveEvent.clientX - startX)));
+      const newHeight = Math.max(250, snapToGrid(startHeight + (moveEvent.clientY - startY)));
       onUpdate({ size: { width: newWidth, height: newHeight } });
     };
 
