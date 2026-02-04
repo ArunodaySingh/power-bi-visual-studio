@@ -1,4 +1,4 @@
-import { BarChart3, LineChart, PieChart, Table2, Gauge, TrendingUp, LayoutGrid } from "lucide-react";
+import { BarChart3, LineChart, PieChart, Table2, TrendingUp, LayoutGrid, Grid3X3, CreditCard, GitBranch, Triangle, CircleDot, Layers } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "./ui/button";
 import {
@@ -10,23 +10,41 @@ import {
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 
-export type VisualizationType = "bar" | "line" | "pie" | "gauge" | "area" | "matrix" | "table" | "card";
+export type VisualizationType = 
+  | "bar" 
+  | "line" 
+  | "pie" 
+  | "area" 
+  | "matrix" 
+  | "table" 
+  | "card"
+  | "waterfall"
+  | "treemap"
+  | "funnel"
+  | "scatter"
+  | "combo";
 
 interface VisualizationOption {
   type: VisualizationType;
   icon: React.ElementType;
   label: string;
   description: string;
+  disabled?: boolean;
 }
 
 const visualizationOptions: VisualizationOption[] = [
   { type: "bar", icon: BarChart3, label: "Bar Chart", description: "Compare values across categories" },
-  { type: "line", icon: LineChart, label: "Line Chart", description: "Show trends over time" },
+  { type: "line", icon: LineChart, label: "Single Line Chart", description: "Show trends over time" },
   { type: "pie", icon: PieChart, label: "Pie Chart", description: "Show proportions of a whole" },
   { type: "area", icon: TrendingUp, label: "Area Chart", description: "Visualize cumulative totals" },
-  { type: "gauge", icon: Gauge, label: "Gauge", description: "Display a single metric" },
-  { type: "matrix", icon: LayoutGrid, label: "Matrix", description: "Show data in rows and columns" },
+  { type: "matrix", icon: Grid3X3, label: "Matrix", description: "Show data in rows and columns", disabled: true },
   { type: "table", icon: Table2, label: "Table", description: "Display data in tabular format" },
+  { type: "card", icon: CreditCard, label: "Card", description: "Display KPI metrics" },
+  { type: "waterfall", icon: GitBranch, label: "Waterfall", description: "Show cumulative effect" },
+  { type: "treemap", icon: Layers, label: "Treemap", description: "Hierarchical data display" },
+  { type: "funnel", icon: Triangle, label: "Funnel", description: "Conversion flow visualization" },
+  { type: "scatter", icon: CircleDot, label: "Scatter", description: "Correlation analysis" },
+  { type: "combo", icon: TrendingUp, label: "Combo", description: "Combined chart types" },
 ];
 
 interface VisualizationSelectorProps {
@@ -46,7 +64,7 @@ export function VisualizationSelector({ onSelect, triggerLabel = "Add Visual" }:
       <DropdownMenuContent align="start" className="w-64">
         <DropdownMenuLabel>Select Visualization</DropdownMenuLabel>
         <DropdownMenuSeparator />
-        {visualizationOptions.map((option) => (
+        {visualizationOptions.filter(o => !o.disabled).map((option) => (
           <DropdownMenuItem
             key={option.type}
             onClick={() => onSelect(option.type)}
@@ -75,24 +93,31 @@ export function VisualizationGridSelector({ selected, onSelect }: VisualizationG
       {visualizationOptions.map((option) => (
         <button
           key={option.type}
-          onClick={() => onSelect(option.type)}
+          onClick={() => !option.disabled && onSelect(option.type)}
+          disabled={option.disabled}
           className={cn(
             "flex flex-col items-center gap-1.5 p-3 rounded-lg border-2 transition-all",
-            selected === option.type
-              ? "border-primary bg-primary/10"
-              : "border-transparent bg-muted/50 hover:bg-muted hover:border-border"
+            option.disabled 
+              ? "opacity-50 cursor-not-allowed border-transparent bg-muted/30"
+              : selected === option.type
+                ? "border-primary bg-primary/10"
+                : "border-transparent bg-muted/50 hover:bg-muted hover:border-border"
           )}
         >
           <option.icon
             className={cn(
               "h-5 w-5",
-              selected === option.type ? "text-primary" : "text-muted-foreground"
+              option.disabled 
+                ? "text-muted-foreground/50"
+                : selected === option.type ? "text-primary" : "text-muted-foreground"
             )}
           />
           <span
             className={cn(
               "text-xs font-medium text-center",
-              selected === option.type ? "text-foreground" : "text-muted-foreground"
+              option.disabled 
+                ? "text-muted-foreground/50"
+                : selected === option.type ? "text-foreground" : "text-muted-foreground"
             )}
           >
             {option.label}

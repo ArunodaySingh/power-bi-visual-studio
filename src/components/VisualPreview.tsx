@@ -276,35 +276,7 @@ export function VisualPreview({
           </ResponsiveContainer>
         );
 
-      case "gauge":
-        const total = chartData.reduce((acc, d) => acc + d.value, 0);
-        const avg = chartData.length ? total / chartData.length : 0;
-        const percentage = Math.min(avg, 100);
-        
-        return (
-          <div className="flex flex-col items-center justify-center h-full">
-            <div className="relative w-48 h-24 overflow-hidden">
-              <div
-                className="absolute inset-0 border-[12px] border-secondary rounded-t-full"
-                style={{ borderBottomWidth: 0 }}
-              />
-              <div
-                className="absolute inset-0 border-[12px] rounded-t-full transition-all duration-500"
-                style={{
-                  borderColor: properties.primaryColor,
-                  borderBottomWidth: 0,
-                  clipPath: `polygon(0 0, ${percentage}% 0, ${percentage}% 100%, 0 100%)`,
-                }}
-              />
-            </div>
-            <div className="text-center mt-2">
-              <div className="text-3xl font-bold" style={{ color: properties.primaryColor }}>
-                {avg.toFixed(0)}%
-              </div>
-              <div className="text-sm text-muted-foreground">Average Value</div>
-            </div>
-          </div>
-        );
+      // Gauge removed - no longer supported
 
       case "matrix":
         return (

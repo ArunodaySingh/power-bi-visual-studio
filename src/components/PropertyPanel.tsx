@@ -226,22 +226,6 @@ export function PropertyPanel({ properties, onChange, availableFields = [] }: Pr
               className="w-full"
             />
           </div>
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <Label className="text-xs text-muted-foreground">Animation Duration</Label>
-              <span className="text-xs font-mono text-muted-foreground">
-                {properties.animationDuration}ms
-              </span>
-            </div>
-            <Slider
-              value={[properties.animationDuration]}
-              onValueChange={([value]) => updateProperty("animationDuration", value)}
-              min={0}
-              max={2000}
-              step={100}
-              className="w-full"
-            />
-          </div>
         </div>
       </Section>
 

@@ -889,8 +889,9 @@ function DashboardContent() {
             <aside className="w-64 border-r bg-card flex flex-col overflow-hidden">
               <ComponentPalette 
                 onAddVisual={handleAddVisual} 
-                onAddLayout={handleAddPanel}
                 onAddSlicer={handleAddSlicer}
+                onChangeVisualType={handleTypeChange}
+                selectedVisualType={selectedVisual?.type || null}
               />
             </aside>
           )}
@@ -1125,6 +1126,7 @@ function DashboardContent() {
                       <ChartConfigDropdowns
                         config={visualConfigs.get(selectedVisual.id) || { measure: "", groupBy: "", dateGranularity: "none" }}
                         onChange={(config) => handleChartConfigChange(selectedVisual.id, config)}
+                        visualType={selectedVisual.type}
                       />
                     ) : selectedPanel ? (
                       <div className="space-y-3">

@@ -121,6 +121,7 @@ export interface ChartConfig {
 interface ChartConfigDropdownsProps {
   config: ChartConfig;                        // Current configuration state
   onChange: (config: ChartConfig) => void;    // Callback when config changes
+  visualType?: string;                        // Type of visual (for conditional rendering)
 }
 
 // ============================================================================
@@ -132,8 +133,12 @@ interface ChartConfigDropdownsProps {
  * 
  * @param config - Current chart configuration
  * @param onChange - Callback fired when any dropdown value changes
+ * @param visualType - Type of visual for conditional UI (e.g., "pie" hides date)
  */
-export function ChartConfigDropdowns({ config, onChange }: ChartConfigDropdownsProps) {
+export function ChartConfigDropdowns({ config, onChange, visualType }: ChartConfigDropdownsProps) {
+  
+  // Check if this is a pie chart - pie charts have different field labels
+  const isPieChart = visualType === "pie";
   
   // Handler for measure dropdown change
   const handleMeasureChange = (value: string) => {
@@ -179,14 +184,14 @@ export function ChartConfigDropdowns({ config, onChange }: ChartConfigDropdownsP
         </Select>
       </div>
 
-      {/* GroupBy Dropdown - Select dimension to group data by */}
+      {/* GroupBy/Legend Dropdown - Label changes for pie charts */}
       <div className="space-y-2">
         <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-          Group By
+          {isPieChart ? "Legend" : "Group By"}
         </Label>
         <Select value={config.groupBy} onValueChange={handleGroupByChange}>
           <SelectTrigger className="w-full">
-            <SelectValue placeholder="Select dimension..." />
+            <SelectValue placeholder={isPieChart ? "Select legend..." : "Select dimension..."} />
           </SelectTrigger>
           <SelectContent className="max-h-[300px]">
             {groupByDimensions.map((dimension) => (
@@ -198,24 +203,26 @@ export function ChartConfigDropdowns({ config, onChange }: ChartConfigDropdownsP
         </Select>
       </div>
 
-      {/* Date Dropdown - Select time granularity for aggregation */}
-      <div className="space-y-2">
-        <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-          Date
-        </Label>
-        <Select value={config.dateGranularity} onValueChange={handleDateChange}>
-          <SelectTrigger className="w-full">
-            <SelectValue placeholder="Select date split..." />
-          </SelectTrigger>
-          <SelectContent>
-            {dateGranularities.map((option) => (
-              <SelectItem key={option.value} value={option.value}>
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+      {/* Date Dropdown - Hidden for pie charts */}
+      {!isPieChart && (
+        <div className="space-y-2">
+          <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            Date
+          </Label>
+          <Select value={config.dateGranularity} onValueChange={handleDateChange}>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Select date split..." />
+            </SelectTrigger>
+            <SelectContent>
+              {dateGranularities.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
 
       {/* Configuration Summary - Shows current selection in readable format */}
       {config.measure && config.groupBy && (
@@ -223,7 +230,7 @@ export function ChartConfigDropdowns({ config, onChange }: ChartConfigDropdownsP
           <p className="text-sm text-muted-foreground">
             Showing <span className="font-medium text-foreground">{config.measure}</span> by{" "}
             <span className="font-medium text-foreground">{config.groupBy}</span>
-            {config.dateGranularity !== "none" && (
+            {!isPieChart && config.dateGranularity !== "none" && (
               <> split by <span className="font-medium text-foreground">{config.dateGranularity}</span></>
             )}
           </p>

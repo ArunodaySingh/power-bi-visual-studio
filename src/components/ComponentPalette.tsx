@@ -3,9 +3,7 @@ import {
   LineChart, 
   PieChart, 
   Table2, 
-  Gauge, 
   TrendingUp, 
-  LayoutGrid, 
   CreditCard, 
   Grid3X3, 
   Filter, 
@@ -15,13 +13,12 @@ import {
   GitBranch,
   Triangle,
   CircleDot,
-  Layers
+  Layers,
+  LayoutGrid
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ScrollArea } from "./ui/scroll-area";
-import { LayoutPalette } from "./LayoutPalette";
 import type { VisualizationType } from "./VisualizationSelector";
-import type { LayoutType } from "./LayoutPalette";
 import type { SlicerType } from "@/types/dashboard";
 import { useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
@@ -30,7 +27,8 @@ interface ComponentOption {
   type: VisualizationType;
   icon: React.ElementType;
   label: string;
-  category: "charts" | "tables" | "cards" | "advanced";
+  category: "charts" | "tables" | "cards";
+  disabled?: boolean;
 }
 
 interface SlicerOption {
@@ -40,19 +38,21 @@ interface SlicerOption {
 }
 
 const componentOptions: ComponentOption[] = [
+  // Charts
   { type: "bar", icon: BarChart3, label: "Bar Chart", category: "charts" },
-  { type: "line", icon: LineChart, label: "Line Chart", category: "charts" },
+  { type: "line", icon: LineChart, label: "Single Line Chart", category: "charts" },
   { type: "pie", icon: PieChart, label: "Pie Chart", category: "charts" },
   { type: "area", icon: TrendingUp, label: "Area Chart", category: "charts" },
-  { type: "gauge", icon: Gauge, label: "Gauge", category: "charts" },
   { type: "combo" as VisualizationType, icon: TrendingUp, label: "Combo", category: "charts" },
-  { type: "matrix", icon: Grid3X3, label: "Matrix", category: "tables" },
+  { type: "waterfall" as VisualizationType, icon: GitBranch, label: "Waterfall", category: "charts" },
+  { type: "treemap" as VisualizationType, icon: Layers, label: "Treemap", category: "charts" },
+  { type: "funnel" as VisualizationType, icon: Triangle, label: "Funnel", category: "charts" },
+  { type: "scatter" as VisualizationType, icon: CircleDot, label: "Scatter", category: "charts" },
+  // Tables
+  { type: "matrix", icon: Grid3X3, label: "Matrix", category: "tables", disabled: true },
   { type: "table", icon: Table2, label: "Table", category: "tables" },
-  { type: "card" as VisualizationType, icon: CreditCard, label: "KPI Card", category: "cards" },
-  { type: "waterfall" as VisualizationType, icon: GitBranch, label: "Waterfall", category: "advanced" },
-  { type: "treemap" as VisualizationType, icon: Layers, label: "Treemap", category: "advanced" },
-  { type: "funnel" as VisualizationType, icon: Triangle, label: "Funnel", category: "advanced" },
-  { type: "scatter" as VisualizationType, icon: CircleDot, label: "Scatter", category: "advanced" },
+  // Cards (renamed from KPI Card)
+  { type: "card" as VisualizationType, icon: CreditCard, label: "Card", category: "cards" },
 ];
 
 const slicerOptions: SlicerOption[] = [
@@ -64,12 +64,15 @@ const slicerOptions: SlicerOption[] = [
 
 interface DraggableComponentItemProps {
   component: ComponentOption;
+  isSelected?: boolean;
+  onClick?: () => void;
 }
 
-function DraggableComponentItem({ component }: DraggableComponentItemProps) {
+function DraggableComponentItem({ component, isSelected, onClick }: DraggableComponentItemProps) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `component-${component.type}`,
     data: { type: "component", componentType: component.type },
+    disabled: component.disabled,
   });
 
   const style = {
@@ -82,15 +85,40 @@ function DraggableComponentItem({ component }: DraggableComponentItemProps) {
       style={style}
       {...listeners}
       {...attributes}
+      onClick={(e) => {
+        e.stopPropagation();
+        if (!component.disabled && onClick) onClick();
+      }}
       className={cn(
-        "flex flex-col items-center justify-center gap-2 p-3 rounded-lg border-2 border-transparent min-h-[72px]",
-        "bg-muted/50 hover:bg-muted hover:border-border transition-all",
-        "cursor-grab active:cursor-grabbing group overflow-hidden",
+        "flex flex-col items-center justify-center gap-2 p-3 rounded-lg border-2 min-h-[72px]",
+        "transition-all overflow-hidden",
+        component.disabled 
+          ? "opacity-50 cursor-not-allowed border-transparent bg-muted/30"
+          : cn(
+              "bg-muted/50 hover:bg-muted cursor-grab active:cursor-grabbing group",
+              isSelected 
+                ? "border-primary bg-primary/10" 
+                : "border-transparent hover:border-border"
+            ),
         isDragging && "opacity-50 ring-2 ring-primary"
       )}
     >
-      <component.icon className="h-6 w-6 text-muted-foreground group-hover:text-foreground transition-colors flex-shrink-0" />
-      <span className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition-colors text-center truncate w-full">
+      <component.icon className={cn(
+        "h-6 w-6 transition-colors flex-shrink-0",
+        component.disabled 
+          ? "text-muted-foreground/50" 
+          : isSelected 
+            ? "text-primary" 
+            : "text-muted-foreground group-hover:text-foreground"
+      )} />
+      <span className={cn(
+        "text-sm font-medium transition-colors text-center truncate w-full",
+        component.disabled 
+          ? "text-muted-foreground/50" 
+          : isSelected 
+            ? "text-primary" 
+            : "text-muted-foreground group-hover:text-foreground"
+      )}>
         {component.label}
       </span>
     </div>
@@ -134,15 +162,27 @@ function DraggableSlicerItem({ slicer }: DraggableSlicerItemProps) {
 
 interface ComponentPaletteProps {
   onAddVisual: (type: VisualizationType) => void;
-  onAddLayout?: (type: LayoutType) => void;
+  onChangeVisualType?: (type: VisualizationType) => void;
+  selectedVisualType?: VisualizationType | null;
   onAddSlicer?: (type: SlicerType) => void;
 }
 
-export function ComponentPalette({ onAddVisual, onAddLayout, onAddSlicer }: ComponentPaletteProps) {
+export function ComponentPalette({ 
+  onAddVisual, 
+  onChangeVisualType, 
+  selectedVisualType,
+  onAddSlicer 
+}: ComponentPaletteProps) {
   const charts = componentOptions.filter((c) => c.category === "charts");
   const tables = componentOptions.filter((c) => c.category === "tables");
   const cards = componentOptions.filter((c) => c.category === "cards");
-  const advanced = componentOptions.filter((c) => c.category === "advanced");
+
+  const handleComponentClick = (type: VisualizationType) => {
+    // If a visual is selected and we have a change handler, change the type
+    if (selectedVisualType && onChangeVisualType) {
+      onChangeVisualType(type);
+    }
+  };
 
   const renderSection = (title: string, items: ComponentOption[], description?: string) => (
     <div className="space-y-3">
@@ -154,7 +194,12 @@ export function ComponentPalette({ onAddVisual, onAddLayout, onAddSlicer }: Comp
       )}
       <div className="grid grid-cols-2 gap-2.5">
         {items.map((item) => (
-          <DraggableComponentItem key={item.type} component={item} />
+          <DraggableComponentItem 
+            key={item.type} 
+            component={item} 
+            isSelected={selectedVisualType === item.type}
+            onClick={() => handleComponentClick(item.type)}
+          />
         ))}
       </div>
     </div>
@@ -174,32 +219,35 @@ export function ComponentPalette({ onAddVisual, onAddLayout, onAddSlicer }: Comp
       
       <ScrollArea className="flex-1">
         <div className="p-4 space-y-6">
-          {/* Layout Section */}
-          <LayoutPalette onSelectLayout={onAddLayout} />
-          
-          {/* Slicers Section */}
-          <div className="border-t pt-4">
-            <div className="space-y-3">
-              <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider px-1">
-                Filters / Slicers
-              </h3>
-              <p className="text-sm text-muted-foreground px-1 mb-2">
-                Interactive filters for data
-              </p>
-              <div className="grid grid-cols-2 gap-2.5">
-                {slicerOptions.map((slicer) => (
-                  <DraggableSlicerItem key={slicer.type} slicer={slicer} />
-                ))}
-              </div>
+          {/* Filters Section - First */}
+          <div className="space-y-3">
+            <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider px-1">
+              Filters / Slicers
+            </h3>
+            <p className="text-sm text-muted-foreground px-1 mb-2">
+              Interactive filters for data
+            </p>
+            <div className="grid grid-cols-2 gap-2.5">
+              {slicerOptions.map((slicer) => (
+                <DraggableSlicerItem key={slicer.type} slicer={slicer} />
+              ))}
             </div>
           </div>
           
+          {/* KPI Cards Section - Second (renamed from "Cards") */}
+          <div className="border-t pt-4">
+            {renderSection("KPI Cards", cards)}
+          </div>
+          
+          {/* Tables Section - Third */}
+          <div className="border-t pt-4">
+            {renderSection("Tables", tables)}
+          </div>
+          
+          {/* Charts Section - Fourth */}
           <div className="border-t pt-4">
             {renderSection("Charts", charts, "Drag to panel or canvas")}
           </div>
-          {renderSection("Tables", tables)}
-          {renderSection("Cards", cards)}
-          {renderSection("Advanced Charts", advanced)}
         </div>
       </ScrollArea>
     </div>
