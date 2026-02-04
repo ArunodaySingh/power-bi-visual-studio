@@ -368,7 +368,49 @@ export function VisualPreview({
           </div>
         );
 
-      case "waterfall":
+      case "table":
+        // Get all unique keys from the data for dynamic columns
+        const allKeys = data.length > 0 
+          ? Object.keys(data[0]).filter(k => k !== 'id')
+          : ['category', 'value'];
+        
+        return (
+          <div className="h-full overflow-auto">
+            <table className="w-full text-sm">
+              <thead className="sticky top-0 bg-background">
+                <tr className="border-b">
+                  {allKeys.map((key) => (
+                    <th 
+                      key={key} 
+                      className="px-3 py-2 text-left font-medium text-muted-foreground capitalize"
+                    >
+                      {key.replace(/_/g, ' ')}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {data.map((row, i) => (
+                  <tr 
+                    key={i} 
+                    className="border-b border-border/50 hover:bg-secondary/30 cursor-pointer"
+                    onClick={() => onDataClick?.("category", row.category)}
+                    style={{ opacity: isHighlighted(row.category) ? 1 : 0.3 }}
+                  >
+                    {allKeys.map((key) => (
+                      <td key={key} className="px-3 py-2">
+                        {typeof row[key] === 'number' 
+                          ? row[key].toLocaleString() 
+                          : String(row[key] ?? '')}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+
         // Calculate cumulative values for waterfall
         let cumulative = 0;
         const waterfallData = chartData.map((d, i) => {

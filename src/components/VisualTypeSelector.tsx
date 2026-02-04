@@ -4,6 +4,7 @@ import {
   PieChart, 
   TrendingUp, 
   Grid3X3,
+  Table2,
   GitBranch,
   Triangle,
   CircleDot,
@@ -19,6 +20,7 @@ export type VisualType =
   | "pie" 
   | "area" 
   | "matrix"
+  | "table"
   | "waterfall"
   | "treemap"
   | "funnel"
@@ -38,6 +40,7 @@ const visualTypes: { type: VisualType; icon: React.ElementType; label: string; d
   { type: "pie", icon: PieChart, label: "Pie Chart" },
   { type: "area", icon: TrendingUp, label: "Area Chart" },
   { type: "matrix", icon: Grid3X3, label: "Matrix", disabled: true },
+  { type: "table", icon: Table2, label: "Table" },
   { type: "waterfall", icon: GitBranch, label: "Waterfall" },
   { type: "treemap", icon: Layers, label: "Treemap" },
   { type: "funnel", icon: Triangle, label: "Funnel" },
