@@ -78,7 +78,7 @@ export function SlicerBase({
         onSelect();
       }}
       className={cn(
-        "absolute bg-card rounded-lg border shadow-sm transition-all",
+        "absolute bg-background rounded-lg border shadow-sm transition-all",
         isDragging && "shadow-xl ring-2 ring-primary/50 z-50",
         isSelected && "ring-2 ring-primary z-40",
         isResizing && "select-none"
