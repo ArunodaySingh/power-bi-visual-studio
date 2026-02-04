@@ -116,6 +116,8 @@ export interface ChartConfig {
   calculation?: CalculationType;  // For KPI cards
   selectedColumns?: string[];  // For tables
   sortBy?: SortOption;  // For sorting data
+  matrixRows?: GroupByDimension[];  // For matrix - row dimensions
+  matrixColumns?: GroupByDimension[];  // For matrix - column dimensions
 }
 
 // ============================================================================
@@ -137,6 +139,7 @@ export function ChartConfigDropdowns({ config, onChange, visualType }: ChartConf
   const isMultiLineChart = visualType === "multiline";
   const isTableChart = visualType === "table";
   const isCardChart = visualType === "card";
+  const isMatrixChart = visualType === "matrix";
   const isStandardChart = ["bar", "line", "area", "combo", "waterfall", "treemap", "funnel", "scatter"].includes(visualType || "");
 
   const handleMeasureChange = (value: string) => {
@@ -171,8 +174,114 @@ export function ChartConfigDropdowns({ config, onChange, visualType }: ChartConf
     onChange({ ...config, sortBy: value as SortOption });
   };
 
+  const handleMatrixRowToggle = (dim: string) => {
+    const current = config.matrixRows || [];
+    const updated = current.includes(dim as GroupByDimension)
+      ? current.filter(d => d !== dim)
+      : [...current, dim as GroupByDimension];
+    onChange({ ...config, matrixRows: updated });
+  };
+
+  const handleMatrixColumnToggle = (dim: string) => {
+    const current = config.matrixColumns || [];
+    const updated = current.includes(dim as GroupByDimension)
+      ? current.filter(d => d !== dim)
+      : [...current, dim as GroupByDimension];
+    onChange({ ...config, matrixColumns: updated });
+  };
+
   // All available columns for table = measures + dimensions
   const allColumns = [...metaMetrics, ...groupByDimensions];
+
+  // ========== MATRIX CONFIG ==========
+  if (isMatrixChart) {
+    return (
+      <div className="space-y-4 overflow-hidden">
+        <div className="flex items-center gap-2 pb-3 border-b">
+          <BarChart3 className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+          <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+            Matrix Configuration
+          </h3>
+        </div>
+
+        <div className="space-y-2">
+          <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            Values (Measure)
+          </Label>
+          <Select value={config.measure} onValueChange={handleMeasureChange}>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Select a measure..." />
+            </SelectTrigger>
+            <SelectContent className="max-h-[300px]">
+              {metaMetrics.map((metric) => (
+                <SelectItem key={metric} value={metric}>
+                  {metric}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            Row Fields
+          </Label>
+          <ScrollArea className="h-[150px] border rounded-md p-2">
+            <div className="space-y-1">
+              {groupByDimensions.map((dim) => (
+                <div key={dim} className="flex items-center space-x-2 py-1">
+                  <Checkbox
+                    id={`row-${dim}`}
+                    checked={(config.matrixRows || []).includes(dim)}
+                    onCheckedChange={() => handleMatrixRowToggle(dim)}
+                  />
+                  <label htmlFor={`row-${dim}`} className="text-sm cursor-pointer">
+                    {dim}
+                  </label>
+                </div>
+              ))}
+            </div>
+          </ScrollArea>
+        </div>
+
+        <div className="space-y-2">
+          <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            Column Fields
+          </Label>
+          <ScrollArea className="h-[150px] border rounded-md p-2">
+            <div className="space-y-1">
+              {groupByDimensions.map((dim) => (
+                <div key={dim} className="flex items-center space-x-2 py-1">
+                  <Checkbox
+                    id={`col-${dim}`}
+                    checked={(config.matrixColumns || []).includes(dim)}
+                    onCheckedChange={() => handleMatrixColumnToggle(dim)}
+                  />
+                  <label htmlFor={`col-${dim}`} className="text-sm cursor-pointer">
+                    {dim}
+                  </label>
+                </div>
+              ))}
+            </div>
+          </ScrollArea>
+        </div>
+
+        {config.measure && ((config.matrixRows?.length || 0) > 0 || (config.matrixColumns?.length || 0) > 0) && (
+          <div className="pt-3 border-t">
+            <p className="text-sm text-muted-foreground">
+              Showing <span className="font-medium text-foreground">{config.measure}</span>
+              {(config.matrixRows?.length || 0) > 0 && (
+                <> by <span className="font-medium text-foreground">{config.matrixRows?.length} row(s)</span></>
+              )}
+              {(config.matrixColumns?.length || 0) > 0 && (
+                <> × <span className="font-medium text-foreground">{config.matrixColumns?.length} column(s)</span></>
+              )}
+            </p>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   // ========== CARD / KPI CONFIG ==========
   if (isCardChart) {

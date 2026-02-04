@@ -11,6 +11,7 @@ import type { ConditionalRule } from "@/types/dashboard";
 
 export type LegendPosition = "top" | "bottom" | "left" | "right";
 export type BarChartMode = "grouped" | "stacked";
+export type DataLabelPosition = "top" | "inside" | "outside" | "center";
 
 export interface VisualProperties {
   title: string;
@@ -18,6 +19,8 @@ export interface VisualProperties {
   showLegend: boolean;
   legendPosition: LegendPosition;
   showDataLabels: boolean;
+  dataLabelPosition?: DataLabelPosition;
+  dataLabelFormat?: "value" | "percent" | "both";
   primaryColor: string;
   backgroundColor: string;
   fontSize: number;
@@ -25,6 +28,7 @@ export interface VisualProperties {
   animationDuration: number;
   barChartMode: BarChartMode;
   conditionalFormatting?: ConditionalRule[];
+  showTotals?: boolean; // For table visual
 }
 
 interface PropertyPanelProps {
@@ -145,6 +149,71 @@ export function PropertyPanel({ properties, onChange, availableFields = [] }: Pr
               id="showDataLabels"
               checked={properties.showDataLabels}
               onCheckedChange={(checked) => updateProperty("showDataLabels", checked)}
+            />
+          </div>
+          {properties.showDataLabels && (
+            <div className="space-y-3 pl-2 border-l-2 border-border">
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Label Position</Label>
+                <RadioGroup
+                  value={properties.dataLabelPosition || "top"}
+                  onValueChange={(value) => updateProperty("dataLabelPosition", value as DataLabelPosition)}
+                  className="grid grid-cols-2 gap-2"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="top" id="label-top" />
+                    <Label htmlFor="label-top" className="text-xs">Top</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="inside" id="label-inside" />
+                    <Label htmlFor="label-inside" className="text-xs">Inside</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="outside" id="label-outside" />
+                    <Label htmlFor="label-outside" className="text-xs">Outside</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="center" id="label-center" />
+                    <Label htmlFor="label-center" className="text-xs">Center</Label>
+                  </div>
+                </RadioGroup>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Label Format</Label>
+                <RadioGroup
+                  value={properties.dataLabelFormat || "value"}
+                  onValueChange={(value) => updateProperty("dataLabelFormat", value as "value" | "percent" | "both")}
+                  className="space-y-2"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="value" id="format-value" />
+                    <Label htmlFor="format-value" className="text-xs">Value Only</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="percent" id="format-percent" />
+                    <Label htmlFor="format-percent" className="text-xs">Percentage Only</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="both" id="format-both" />
+                    <Label htmlFor="format-both" className="text-xs">Value & Percentage</Label>
+                  </div>
+                </RadioGroup>
+              </div>
+            </div>
+          )}
+        </div>
+      </Section>
+
+      <Section title="Table Options" icon={Layout} defaultOpen={false}>
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <Label htmlFor="showTotals" className="text-xs text-muted-foreground">
+              Show Totals Row
+            </Label>
+            <Switch
+              id="showTotals"
+              checked={properties.showTotals || false}
+              onCheckedChange={(checked) => updateProperty("showTotals", checked)}
             />
           </div>
         </div>

@@ -116,8 +116,13 @@ export function VisualPreview({
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
               <XAxis
                 dataKey="name"
-                tick={{ fontSize: properties.fontSize - 2 }}
+                tick={{ fontSize: Math.max(8, properties.fontSize - 3) }}
                 stroke="hsl(var(--muted-foreground))"
+                height={60}
+                interval={0}
+                angle={-35}
+                textAnchor="end"
+                tickFormatter={(value) => value.length > 12 ? `${value.slice(0, 12)}...` : value}
               />
               <YAxis
                 tick={{ fontSize: properties.fontSize - 2 }}
@@ -173,8 +178,13 @@ export function VisualPreview({
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
               <XAxis
                 dataKey="name"
-                tick={{ fontSize: properties.fontSize - 2 }}
+                tick={{ fontSize: Math.max(8, properties.fontSize - 3) }}
                 stroke="hsl(var(--muted-foreground))"
+                height={60}
+                interval={0}
+                angle={-35}
+                textAnchor="end"
+                tickFormatter={(value) => value.length > 12 ? `${value.slice(0, 12)}...` : value}
               />
               <YAxis
                 tick={{ fontSize: properties.fontSize - 2 }}
@@ -214,8 +224,13 @@ export function VisualPreview({
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
               <XAxis
                 dataKey="name"
-                tick={{ fontSize: properties.fontSize - 2 }}
+                tick={{ fontSize: Math.max(8, properties.fontSize - 3) }}
                 stroke="hsl(var(--muted-foreground))"
+                height={60}
+                interval={0}
+                angle={-35}
+                textAnchor="end"
+                tickFormatter={(value) => value.length > 12 ? `${value.slice(0, 12)}...` : value}
               />
               <YAxis
                 tick={{ fontSize: properties.fontSize - 2 }}
@@ -298,8 +313,13 @@ export function VisualPreview({
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
               <XAxis
                 dataKey="name"
-                tick={{ fontSize: properties.fontSize - 2 }}
+                tick={{ fontSize: Math.max(8, properties.fontSize - 3) }}
                 stroke="hsl(var(--muted-foreground))"
+                height={60}
+                interval={0}
+                angle={-35}
+                textAnchor="end"
+                tickFormatter={(value) => value.length > 12 ? `${value.slice(0, 12)}...` : value}
               />
               <YAxis
                 tick={{ fontSize: properties.fontSize - 2 }}
@@ -374,6 +394,17 @@ export function VisualPreview({
           ? Object.keys(data[0]).filter(k => k !== 'id')
           : ['category', 'value'];
         
+        // Calculate totals for numeric columns
+        const totals: Record<string, number> = {};
+        if (properties.showTotals) {
+          allKeys.forEach(key => {
+            const values = data.map(row => row[key]).filter(v => typeof v === 'number') as number[];
+            if (values.length > 0) {
+              totals[key] = values.reduce((sum, v) => sum + v, 0);
+            }
+          });
+        }
+        
         return (
           <div className="h-full overflow-auto">
             <table className="w-full text-sm">
@@ -407,6 +438,17 @@ export function VisualPreview({
                   </tr>
                 ))}
               </tbody>
+              {properties.showTotals && Object.keys(totals).length > 0 && (
+                <tfoot className="sticky bottom-0 bg-muted/80 font-medium border-t-2">
+                  <tr>
+                    {allKeys.map((key, idx) => (
+                      <td key={key} className="px-3 py-2">
+                        {idx === 0 && !totals[key] ? "Total" : (totals[key] !== undefined ? totals[key].toLocaleString() : "")}
+                      </td>
+                    ))}
+                  </tr>
+                </tfoot>
+              )}
             </table>
           </div>
         );
@@ -431,8 +473,13 @@ export function VisualPreview({
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
               <XAxis
                 dataKey="name"
-                tick={{ fontSize: properties.fontSize - 2 }}
+                tick={{ fontSize: Math.max(8, properties.fontSize - 3) }}
                 stroke="hsl(var(--muted-foreground))"
+                height={60}
+                interval={0}
+                angle={-35}
+                textAnchor="end"
+                tickFormatter={(value) => value.length > 12 ? `${value.slice(0, 12)}...` : value}
               />
               <YAxis
                 tick={{ fontSize: properties.fontSize - 2 }}
@@ -595,8 +642,13 @@ export function VisualPreview({
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
               <XAxis
                 dataKey="name"
-                tick={{ fontSize: properties.fontSize - 2 }}
+                tick={{ fontSize: Math.max(8, properties.fontSize - 3) }}
                 stroke="hsl(var(--muted-foreground))"
+                height={60}
+                interval={0}
+                angle={-35}
+                textAnchor="end"
+                tickFormatter={(value) => value.length > 12 ? `${value.slice(0, 12)}...` : value}
               />
               <YAxis
                 tick={{ fontSize: properties.fontSize - 2 }}

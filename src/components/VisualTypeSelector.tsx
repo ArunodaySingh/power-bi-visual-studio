@@ -39,7 +39,7 @@ const visualTypes: { type: VisualType; icon: React.ElementType; label: string; d
   { type: "multiline", icon: LineChart, label: "Multi Line Chart" },
   { type: "pie", icon: PieChart, label: "Pie Chart" },
   { type: "area", icon: TrendingUp, label: "Area Chart" },
-  { type: "matrix", icon: Grid3X3, label: "Matrix", disabled: true },
+  { type: "matrix", icon: Grid3X3, label: "Matrix" },
   { type: "table", icon: Table2, label: "Table" },
   { type: "waterfall", icon: GitBranch, label: "Waterfall", disabled: true },
   { type: "treemap", icon: Layers, label: "Treemap", disabled: true },

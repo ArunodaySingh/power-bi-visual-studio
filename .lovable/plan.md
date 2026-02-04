@@ -10,30 +10,30 @@
 - **Chart Sorting**: Sort options for all chart types (value/name, asc/desc)
 - **Cross-Filtering**: Click one visual to filter others
 - **Visual Type Switching**: Click palette item to change selected visual type
+- **X-axis Text Fitting**: Rotated labels (-35°), truncation (12 chars), increased height
+- **Preview Button**: Full-screen dashboard preview mode
+- **Data Label Options**: Position (top/inside/outside/center) and format (value/percent/both)
+- **Show Totals Toggle**: Table visual totals row in Format panel
+- **Matrix Visual**: Row/Column fields (Group By dimensions), Values (Measures)
 
 ## 🔲 TBD - Pending Features
 
 ### UI/UX Enhancements
 | Feature | Description | Status |
 |---------|-------------|--------|
-| X-axis Text Fitting | Fit more text labels on x-axis (rotation, truncation) | TBD |
 | Grid Lock | Snap-to-grid alignment for visuals | TBD |
 | Expand on Drag | Visual expands to fill area where dragged | TBD |
-| Preview Button | Full-screen preview mode for dashboard | TBD |
 
 ### Visual Configuration
 | Feature | Description | Status |
 |---------|-------------|--------|
-| Date Split on Visual | Date granularity control per visual | TBD |
-| Sorting on Visual | Sort control per individual visual | TBD |
-| Data Label Options | Show/hide and format data labels | TBD |
-| Show Totals Toggle | Table visual totals row in Format panel | TBD |
+| Date Split on Visual | Date granularity control per visual | ✅ Done (via Date dropdown) |
+| Sorting on Visual | Sort control per individual visual | ✅ Done (via Sort By dropdown) |
 
 ### Chart Types
 | Feature | Description | Status |
 |---------|-------------|--------|
-| Gauge Chart | Fix gauge functionality | TBD |
-| Matrix Visual | Row/Column fields (Group By), Values (Measures) | TBD |
+| Gauge Chart | Fix gauge functionality | TBD (Gauge removed - not supported by recharts) |
 
 ### Advanced Charts (Disabled)
 These charts are currently disabled pending functionality discussion:
@@ -46,15 +46,8 @@ These charts are currently disabled pending functionality discussion:
 
 ## Implementation Notes
 
-### Matrix Visual Redesign
-When implementing Matrix:
-- **Values**: Measures only
-- **Rows**: Group By dimensions
-- **Columns**: Group By dimensions
-- Remove: Group By and Date dropdowns
-
-### Table Show Totals
-Add toggle in Format Visual panel to show/hide totals row at bottom of table.
-
 ### Grid Lock System
 Consider 8px or 16px grid for snap alignment.
+
+### Expand on Drag
+Implement collision detection to expand visual to available space.
