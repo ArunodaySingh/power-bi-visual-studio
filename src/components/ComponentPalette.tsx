@@ -52,7 +52,7 @@ const componentOptions: ComponentOption[] = [
   { type: "funnel" as VisualizationType, icon: Triangle, label: "Funnel", category: "charts", disabled: true },
   { type: "scatter" as VisualizationType, icon: CircleDot, label: "Scatter", category: "charts", disabled: true },
   // Tables
-  { type: "matrix", icon: Grid3X3, label: "Matrix", category: "tables", disabled: true },
+  { type: "matrix", icon: Grid3X3, label: "Matrix", category: "tables" },
   { type: "table", icon: Table2, label: "Table", category: "tables" },
   // Cards (renamed from KPI Card)
   { type: "card" as VisualizationType, icon: CreditCard, label: "Card", category: "cards" },

@@ -18,7 +18,7 @@ import { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 
 // UI Icons - Only import what's needed for the current UI
-import { Settings, LayoutGrid, Loader2, Database, RefreshCw, AlertCircle, Save, ArrowLeft, LogOut, Filter, Type } from "lucide-react";
+import { Settings, LayoutGrid, Loader2, Database, RefreshCw, AlertCircle, Save, ArrowLeft, LogOut, Filter, Type, Eye } from "lucide-react";
 
 // Drag and drop functionality
 import { DndContext, DragEndEvent, DragStartEvent, useSensor, useSensors, PointerSensor, DragOverlay } from "@dnd-kit/core";
@@ -295,6 +295,7 @@ function DashboardContent() {
 
   // Save dialog state
   const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [showPreviewDialog, setShowPreviewDialog] = useState(false);
   const [dashboardName, setDashboardName] = useState("");
   const [dashboardDescription, setDashboardDescription] = useState("");
   const [isSaving, setIsSaving] = useState(false);
@@ -1215,6 +1216,14 @@ function DashboardContent() {
                   {showConfigPanel ? "Hide Right" : "Show Right"}
                 </Button>
                 <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowPreviewDialog(true)}
+                >
+                  <Eye className="h-4 w-4 mr-2" />
+                  Preview
+                </Button>
+                <Button
                   size="sm"
                   onClick={() => setShowSaveDialog(true)}
                 >
@@ -1499,6 +1508,117 @@ function DashboardContent() {
               )}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Preview Dashboard Dialog */}
+      <Dialog open={showPreviewDialog} onOpenChange={setShowPreviewDialog}>
+        <DialogContent className="max-w-[95vw] max-h-[95vh] w-full h-full p-0 overflow-hidden">
+          <DialogHeader className="p-4 border-b">
+            <DialogTitle className="flex items-center gap-2">
+              <Eye className="h-5 w-5" />
+              Dashboard Preview
+            </DialogTitle>
+            <DialogDescription>
+              Full-screen preview of your dashboard
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 p-4 bg-muted/30 canvas-grid overflow-auto relative min-h-[70vh]">
+            {/* Render Text Containers in Preview */}
+            {textContainers.map((container) => (
+              <TextContainer
+                key={container.id}
+                container={container}
+                isSelected={false}
+                canvasWidth={window.innerWidth * 0.9}
+                onSelect={() => {}}
+                onUpdate={() => {}}
+                onDelete={() => {}}
+              />
+            ))}
+
+            {/* Render Slicers in Preview */}
+            {slicers.map((slicer) => {
+              const slicerProps = {
+                slicer,
+                isSelected: false,
+                onSelect: () => {},
+                onUpdate: (updates: Partial<SlicerData>) => handleUpdateSlicer(slicer.id, updates),
+                onDelete: () => {},
+              };
+
+              if (slicer.type === "dropdown") {
+                return (
+                  <DropdownSlicer
+                    key={slicer.id}
+                    {...slicerProps}
+                    availableValues={getSlicerValues(slicer.field)}
+                  />
+                );
+              }
+              if (slicer.type === "list") {
+                return (
+                  <ListSlicer
+                    key={slicer.id}
+                    {...slicerProps}
+                    availableValues={getSlicerValues(slicer.field)}
+                  />
+                );
+              }
+              if (slicer.type === "date-range") {
+                return (
+                  <DateRangeSlicer
+                    key={slicer.id}
+                    {...slicerProps}
+                    dateRange={slicerDateRanges.get(slicer.id) || { start: null, end: null }}
+                    onDateRangeChange={(range) => {
+                      setSlicerDateRanges((prev) => new Map(prev).set(slicer.id, range));
+                    }}
+                  />
+                );
+              }
+              if (slicer.type === "numeric-range") {
+                const values = getSlicerValues(slicer.field).filter((v) => typeof v === "number") as number[];
+                const defaultMin = values.length ? Math.min(...values) : 0;
+                const defaultMax = values.length ? Math.max(...values) : 100;
+                return (
+                  <NumericRangeSlicer
+                    key={slicer.id}
+                    {...slicerProps}
+                    availableValues={values}
+                    range={slicerNumericRanges.get(slicer.id) || { min: defaultMin, max: defaultMax }}
+                    onRangeChange={(range) => {
+                      setSlicerNumericRanges((prev) => new Map(prev).set(slicer.id, range));
+                    }}
+                  />
+                );
+              }
+              return null;
+            })}
+
+            {/* Panel Canvas in Preview */}
+            <PanelCanvas
+              panels={panels}
+              visuals={visuals}
+              slotVisuals={slotVisuals}
+              selectedPanelId={null}
+              selectedVisualId={null}
+              isLayoutDragging={false}
+              isFieldDragging={false}
+              isComponentDragging={false}
+              crossFilterVisualId={crossFilter?.sourceVisualId || null}
+              highlightedValue={crossFilter?.value || null}
+              onSelectPanel={() => {}}
+              onSelectVisual={() => {}}
+              onUpdatePanel={() => {}}
+              onDeletePanel={() => {}}
+              onUpdateVisual={() => {}}
+              onDeleteVisual={() => {}}
+              onDuplicateVisual={() => {}}
+              onRemoveVisualFromSlot={() => {}}
+              onDataClick={handleVisualDataClick}
+            />
+          </div>
         </DialogContent>
       </Dialog>
     </DndContext>
