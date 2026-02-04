@@ -18,7 +18,7 @@ import { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 
 // UI Icons - Only import what's needed for the current UI
-import { Settings, LayoutGrid, Loader2, Database, RefreshCw, AlertCircle, Save, ArrowLeft, LogOut, Filter, Type, Eye } from "lucide-react";
+import { Settings, LayoutGrid, Loader2, Database, RefreshCw, AlertCircle, Save, ArrowLeft, LogOut, Filter, Type, Eye, Grid3X3, Maximize2 } from "lucide-react";
 
 // Drag and drop functionality
 import { DndContext, DragEndEvent, DragStartEvent, useSensor, useSensors, PointerSensor, DragOverlay } from "@dnd-kit/core";
@@ -299,6 +299,53 @@ function DashboardContent() {
   const [dashboardName, setDashboardName] = useState("");
   const [dashboardDescription, setDashboardDescription] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  
+  // Grid lock state - snaps visuals to 16px grid
+  const [gridLockEnabled, setGridLockEnabled] = useState(true);
+  const [autoExpandEnabled, setAutoExpandEnabled] = useState(false);
+  const GRID_SIZE = 16;
+  const CANVAS_WIDTH = 1200; // Default canvas width for expand calculations
+  const CANVAS_HEIGHT = 800; // Default canvas height
+  
+  // Snap value to grid
+  const snapToGrid = useCallback((value: number): number => {
+    if (!gridLockEnabled) return value;
+    return Math.round(value / GRID_SIZE) * GRID_SIZE;
+  }, [gridLockEnabled]);
+  
+  // Calculate available space for a visual at a given position
+  const calculateAvailableSpace = useCallback((
+    position: { x: number; y: number },
+    existingVisuals: CanvasVisualData[],
+    excludeId?: string
+  ): { width: number; height: number } => {
+    let maxWidth = CANVAS_WIDTH - position.x - 50; // Leave some margin
+    let maxHeight = CANVAS_HEIGHT - position.y - 50;
+    
+    // Check collisions with other visuals
+    existingVisuals.forEach((v) => {
+      if (v.id === excludeId) return;
+      
+      // Check if visual is to the right and overlaps vertically
+      if (v.position.x > position.x && 
+          v.position.y < position.y + maxHeight &&
+          v.position.y + v.size.height > position.y) {
+        maxWidth = Math.min(maxWidth, v.position.x - position.x - 20);
+      }
+      
+      // Check if visual is below and overlaps horizontally
+      if (v.position.y > position.y && 
+          v.position.x < position.x + maxWidth &&
+          v.position.x + v.size.width > position.x) {
+        maxHeight = Math.min(maxHeight, v.position.y - position.y - 20);
+      }
+    });
+    
+    return {
+      width: Math.max(400, snapToGrid(maxWidth)),
+      height: Math.max(300, snapToGrid(maxHeight)),
+    };
+  }, [snapToGrid]);
 
   // ========== DERIVED STATE ==========
   // Get current sheet's data for easy access
@@ -627,7 +674,16 @@ function DashboardContent() {
     const visualType = (type || "bar") as VisualType;
     const newVisual = createNewVisual(visuals.length, visualType);
     if (position) {
-      newVisual.position = position;
+      newVisual.position = {
+        x: snapToGrid(position.x),
+        y: snapToGrid(position.y),
+      };
+      
+      // Auto-expand to fill available space if enabled
+      if (autoExpandEnabled) {
+        const expandedSize = calculateAvailableSpace(newVisual.position, visuals);
+        newVisual.size = expandedSize;
+      }
     }
     setSheets((prev) =>
       prev.map((s) =>
@@ -637,7 +693,7 @@ function DashboardContent() {
     setSelectedVisualId(newVisual.id);
     setSelectedPanelId(null);
     toast.success(`Added ${visualType} chart`);
-  }, [visuals.length, activeSheetId]);
+  }, [visuals, activeSheetId, snapToGrid, autoExpandEnabled, calculateAvailableSpace]);
 
   const handleDeleteVisual = useCallback((id: string) => {
     setSheets((prev) =>
@@ -1065,8 +1121,8 @@ function DashboardContent() {
       if (container && !container.snapToTop && !container.matchWidth) {
         handleUpdateTextContainer(containerId, {
           position: {
-            x: container.position.x + delta.x,
-            y: container.position.y + delta.y,
+            x: snapToGrid(container.position.x + delta.x),
+            y: snapToGrid(container.position.y + delta.y),
           },
         });
       }
@@ -1082,8 +1138,8 @@ function DashboardContent() {
       if (slicer) {
         handleUpdateSlicer(slicerId, {
           position: {
-            x: slicer.position.x + delta.x,
-            y: slicer.position.y + delta.y,
+            x: snapToGrid(slicer.position.x + delta.x),
+            y: snapToGrid(slicer.position.y + delta.y),
           },
         });
       }
@@ -1097,8 +1153,8 @@ function DashboardContent() {
       if (panel) {
         handleUpdatePanel(panelId, {
           position: {
-            x: panel.position.x + delta.x,
-            y: panel.position.y + delta.y,
+            x: snapToGrid(panel.position.x + delta.x),
+            y: snapToGrid(panel.position.y + delta.y),
           },
         });
       }
@@ -1110,8 +1166,8 @@ function DashboardContent() {
     if (visual) {
       handleUpdateVisual(activeId, {
         position: {
-          x: visual.position.x + delta.x,
-          y: visual.position.y + delta.y,
+          x: snapToGrid(visual.position.x + delta.x),
+          y: snapToGrid(visual.position.y + delta.y),
         },
       });
     }
@@ -1209,6 +1265,24 @@ function DashboardContent() {
                   />
                 )}
                 <Button
+                  variant={gridLockEnabled ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setGridLockEnabled(!gridLockEnabled)}
+                  title={gridLockEnabled ? "Grid Lock: ON (click to disable)" : "Grid Lock: OFF (click to enable)"}
+                >
+                  <Grid3X3 className="h-4 w-4 mr-1" />
+                  Grid
+                </Button>
+                <Button
+                  variant={autoExpandEnabled ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setAutoExpandEnabled(!autoExpandEnabled)}
+                  title={autoExpandEnabled ? "Auto-Expand: ON (visuals fill available space)" : "Auto-Expand: OFF (fixed size)"}
+                >
+                  <Maximize2 className="h-4 w-4 mr-1" />
+                  Expand
+                </Button>
+                <Button
                   variant="outline"
                   size="sm"
                   onClick={() => setShowConfigPanel(!showConfigPanel)}
@@ -1242,7 +1316,7 @@ function DashboardContent() {
             </div>
 
             {/* Canvas with Slicers and Text Containers */}
-            <div className="flex-1 p-4 bg-muted/30 canvas-grid overflow-auto relative">
+            <div className={`flex-1 p-4 bg-muted/30 overflow-auto relative ${gridLockEnabled ? 'canvas-grid-visible' : ''}`}>
               {/* Render Text Containers */}
               {textContainers.map((container) => (
                 <TextContainer

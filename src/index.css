@@ -171,4 +171,12 @@
   .shadow-visual {
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1), 0 8px 24px rgba(0, 0, 0, 0.08);
   }
+  
+  /* Canvas grid pattern for snap-to-grid */
+  .canvas-grid-visible {
+    background-image: 
+      linear-gradient(to right, hsl(var(--border) / 0.3) 1px, transparent 1px),
+      linear-gradient(to bottom, hsl(var(--border) / 0.3) 1px, transparent 1px);
+    background-size: 16px 16px;
+  }
 }
