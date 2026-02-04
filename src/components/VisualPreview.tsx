@@ -202,6 +202,56 @@ export function VisualPreview({
           </ResponsiveContainer>
         );
 
+      case "multiline":
+        const multiLineLegendPosition = properties.legendPosition || "bottom";
+        const multiLineLegendLayout = multiLineLegendPosition === "left" || multiLineLegendPosition === "right" ? "vertical" : "horizontal";
+        const multiLineLegendAlign = multiLineLegendPosition === "left" ? "left" : multiLineLegendPosition === "right" ? "right" : "center";
+        const multiLineLegendVerticalAlign = multiLineLegendPosition === "top" ? "top" : multiLineLegendPosition === "bottom" ? "bottom" : "middle";
+        
+        return (
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={chartData} margin={{ top: 20, right: 30, left: 0, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+              <XAxis
+                dataKey="name"
+                tick={{ fontSize: properties.fontSize - 2 }}
+                stroke="hsl(var(--muted-foreground))"
+              />
+              <YAxis
+                tick={{ fontSize: properties.fontSize - 2 }}
+                stroke="hsl(var(--muted-foreground))"
+              />
+              <Tooltip
+                contentStyle={{
+                  backgroundColor: "hsl(var(--card))",
+                  border: "1px solid hsl(var(--border))",
+                  borderRadius: properties.borderRadius,
+                  fontSize: properties.fontSize - 2,
+                }}
+              />
+              <Legend 
+                layout={multiLineLegendLayout}
+                align={multiLineLegendAlign}
+                verticalAlign={multiLineLegendVerticalAlign}
+                wrapperStyle={multiLineLegendPosition === "left" || multiLineLegendPosition === "right" ? { paddingLeft: 10, paddingRight: 10 } : {}}
+              />
+              {valueKeys.map((key, idx) => (
+                <Line
+                  key={key}
+                  type="monotone"
+                  dataKey={key}
+                  name={valueFieldNames[idx] || key}
+                  stroke={CHART_COLORS[idx % CHART_COLORS.length]}
+                  strokeWidth={2}
+                  dot={{ fill: CHART_COLORS[idx % CHART_COLORS.length], strokeWidth: 2 }}
+                  animationDuration={properties.animationDuration}
+                  label={properties.showDataLabels ? { position: "top", fontSize: properties.fontSize - 2 } : undefined}
+                />
+              ))}
+            </LineChart>
+          </ResponsiveContainer>
+        );
+
       case "pie":
         return (
           <ResponsiveContainer width="100%" height="100%">

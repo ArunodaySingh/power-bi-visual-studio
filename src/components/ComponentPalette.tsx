@@ -41,6 +41,7 @@ const componentOptions: ComponentOption[] = [
   // Charts
   { type: "bar", icon: BarChart3, label: "Bar Chart", category: "charts" },
   { type: "line", icon: LineChart, label: "Single Line Chart", category: "charts" },
+  { type: "multiline" as VisualizationType, icon: LineChart, label: "Multi Line Chart", category: "charts" },
   { type: "pie", icon: PieChart, label: "Pie Chart", category: "charts" },
   { type: "area", icon: TrendingUp, label: "Area Chart", category: "charts" },
   { type: "combo" as VisualizationType, icon: TrendingUp, label: "Combo", category: "charts" },
@@ -220,7 +221,7 @@ export function ComponentPalette({
       <ScrollArea className="flex-1">
         <div className="p-4 space-y-6">
           {/* Filters Section - First */}
-          <div className="space-y-3">
+          <div className="space-y-3 bg-background p-3 rounded-lg border">
             <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider px-1">
               Filters / Slicers
             </h3>

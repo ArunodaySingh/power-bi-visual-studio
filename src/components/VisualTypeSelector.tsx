@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 export type VisualType = 
   | "bar" 
   | "line" 
+  | "multiline"
   | "pie" 
   | "area" 
   | "matrix"
@@ -33,6 +34,7 @@ interface VisualTypeSelectorProps {
 const visualTypes: { type: VisualType; icon: React.ElementType; label: string; disabled?: boolean }[] = [
   { type: "bar", icon: BarChart3, label: "Bar Chart" },
   { type: "line", icon: LineChart, label: "Single Line Chart" },
+  { type: "multiline", icon: LineChart, label: "Multi Line Chart" },
   { type: "pie", icon: PieChart, label: "Pie Chart" },
   { type: "area", icon: TrendingUp, label: "Area Chart" },
   { type: "matrix", icon: Grid3X3, label: "Matrix", disabled: true },

@@ -13,6 +13,7 @@ import {
 export type VisualizationType = 
   | "bar" 
   | "line" 
+  | "multiline"
   | "pie" 
   | "area" 
   | "matrix" 
@@ -35,6 +36,7 @@ interface VisualizationOption {
 const visualizationOptions: VisualizationOption[] = [
   { type: "bar", icon: BarChart3, label: "Bar Chart", description: "Compare values across categories" },
   { type: "line", icon: LineChart, label: "Single Line Chart", description: "Show trends over time" },
+  { type: "multiline", icon: LineChart, label: "Multi Line Chart", description: "Compare multiple series" },
   { type: "pie", icon: PieChart, label: "Pie Chart", description: "Show proportions of a whole" },
   { type: "area", icon: TrendingUp, label: "Area Chart", description: "Visualize cumulative totals" },
   { type: "matrix", icon: Grid3X3, label: "Matrix", description: "Show data in rows and columns", disabled: true },
