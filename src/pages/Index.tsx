@@ -185,19 +185,19 @@ const createEmptySheet = (name: string): SheetData => ({
 });
 
 /**
- * Creates a new text container
- * @param type - "text" or "logo"
- * @param index - Position index for auto-layout
+ * Creates a new text container (header with optional logo)
  */
-const createNewTextContainer = (type: "text" | "logo", index: number): TextContainerData => ({
+const createNewTextContainer = (): TextContainerData => ({
   id: crypto.randomUUID(),
-  type,
-  content: type === "text" ? "Dashboard Title" : "",
+  type: "header",
+  content: "Dashboard Title",
+  logoUrl: undefined,
+  logoPosition: "left",
   position: { x: 0, y: 0 },
-  size: { width: 400, height: 80 },
-  fontSize: type === "text" ? 24 : 16,
+  size: { width: 500, height: 80 },
+  fontSize: 24,
   fontWeight: "bold",
-  textAlign: "center",
+  textAlign: "left",
   snapToTop: true,
   matchWidth: true,
 });
@@ -499,8 +499,8 @@ function DashboardContent() {
   }, [activeSheetId, slicers, removeFilter]);
 
   // Text container handlers
-  const handleAddTextContainer = useCallback((type: "text" | "logo", position?: { x: number; y: number }) => {
-    const newContainer = createNewTextContainer(type, textContainers.length);
+  const handleAddTextContainer = useCallback((position?: { x: number; y: number }) => {
+    const newContainer = createNewTextContainer();
     if (position) {
       newContainer.position = position;
     }
@@ -513,8 +513,8 @@ function DashboardContent() {
     setSelectedPanelId(null);
     setSelectedVisualId(null);
     setSelectedSlicerId(null);
-    toast.success(`Added ${type === "text" ? "text header" : "logo"}`);
-  }, [textContainers.length, activeSheetId]);
+    toast.success("Added header");
+  }, [activeSheetId]);
 
   const handleUpdateTextContainer = useCallback((id: string, updates: Partial<TextContainerData>) => {
     setSheets((prev) =>
@@ -999,10 +999,7 @@ function DashboardContent() {
     if (activeId.startsWith("text-type-") && over) {
       const overId = over.id as string;
       if (overId === "canvas-drop" || !overId.startsWith("slot-") && !overId.startsWith("drop-") && !overId.startsWith("visual-")) {
-        const textType = activeData?.textType as "text" | "logo";
-        if (textType) {
-          handleAddTextContainer(textType, { x: 0, y: 0 });
-        }
+        handleAddTextContainer({ x: 0, y: 0 });
       }
       return;
     }

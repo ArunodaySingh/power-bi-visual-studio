@@ -66,14 +66,13 @@ const slicerOptions: SlicerOption[] = [
 ];
 
 interface TextContainerOption {
-  type: "text" | "logo";
+  type: "header";
   icon: React.ElementType;
   label: string;
 }
 
 const textContainerOptions: TextContainerOption[] = [
-  { type: "text", icon: Type, label: "Text Header" },
-  { type: "logo", icon: Image, label: "Logo" },
+  { type: "header", icon: Type, label: "Header" },
 ];
 
 interface DraggableComponentItemProps {
@@ -176,9 +175,10 @@ function DraggableSlicerItem({ slicer }: DraggableSlicerItemProps) {
 
 interface DraggableTextItemProps {
   item: TextContainerOption;
+  onClick?: () => void;
 }
 
-function DraggableTextItem({ item }: DraggableTextItemProps) {
+function DraggableTextItem({ item, onClick }: DraggableTextItemProps) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `text-type-${item.type}`,
     data: { type: "text-type", textType: item.type },
@@ -194,6 +194,10 @@ function DraggableTextItem({ item }: DraggableTextItemProps) {
       style={style}
       {...listeners}
       {...attributes}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick?.();
+      }}
       className={cn(
         "flex flex-col items-center justify-center gap-2 p-3 rounded-lg border-2 border-transparent min-h-[72px]",
         "bg-secondary/50 hover:bg-secondary hover:border-border transition-all",
@@ -214,7 +218,7 @@ interface ComponentPaletteProps {
   onChangeVisualType?: (type: VisualizationType) => void;
   selectedVisualType?: VisualizationType | null;
   onAddSlicer?: (type: SlicerType) => void;
-  onAddTextContainer?: (type: "text" | "logo") => void;
+  onAddTextContainer?: () => void;
 }
 
 export function ComponentPalette({ 
@@ -283,7 +287,11 @@ export function ComponentPalette({
             </p>
             <div className="grid grid-cols-2 gap-2.5">
               {textContainerOptions.map((item) => (
-                <DraggableTextItem key={item.type} item={item} />
+                <DraggableTextItem 
+                  key={item.type} 
+                  item={item} 
+                  onClick={() => onAddTextContainer?.()}
+                />
               ))}
             </div>
           </div>

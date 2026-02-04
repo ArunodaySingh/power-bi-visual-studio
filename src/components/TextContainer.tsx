@@ -1,15 +1,17 @@
 import { useState, useRef } from "react";
 import { useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
-import { Move, Maximize2, X, Type, Image } from "lucide-react";
+import { Move, Maximize2, X, Type, Image, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
 export interface TextContainerData {
   id: string;
-  type: "text" | "logo";
-  content: string;
+  type: "header"; // Combined type - header with optional logo
+  content: string; // Text content
+  logoUrl?: string; // Optional logo image URL
+  logoPosition?: "left" | "right"; // Logo position relative to text
   position: { x: number; y: number };
   size: { width: number; height: number };
   fontSize?: number;
@@ -42,6 +44,7 @@ export function TextContainer({
   });
 
   const resizeRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [isResizing, setIsResizing] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
 
@@ -62,7 +65,7 @@ export function TextContainer({
   };
 
   const handleResizeStart = (e: React.MouseEvent) => {
-    if (container.matchWidth) return; // Don't allow resize if matching width
+    if (container.matchWidth) return;
     
     e.preventDefault();
     e.stopPropagation();
@@ -74,8 +77,8 @@ export function TextContainer({
     const startHeight = container.size.height;
 
     const handleMouseMove = (moveEvent: MouseEvent) => {
-      const newWidth = Math.max(100, startWidth + (moveEvent.clientX - startX));
-      const newHeight = Math.max(40, startHeight + (moveEvent.clientY - startY));
+      const newWidth = Math.max(200, startWidth + (moveEvent.clientX - startX));
+      const newHeight = Math.max(60, startHeight + (moveEvent.clientY - startY));
       onUpdate({ size: { width: newWidth, height: newHeight } });
     };
 
@@ -89,8 +92,10 @@ export function TextContainer({
     document.addEventListener("mouseup", handleMouseUp);
   };
 
-  const handleDoubleClick = () => {
-    if (container.type === "text") {
+  const handleDoubleClick = (e: React.MouseEvent) => {
+    // Only enable editing when clicking on text area
+    const target = e.target as HTMLElement;
+    if (!target.closest('.logo-area')) {
       setIsEditing(true);
     }
   };
@@ -104,6 +109,25 @@ export function TextContainer({
       setIsEditing(false);
     }
   };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const dataUrl = event.target?.result as string;
+        onUpdate({ logoUrl: dataUrl });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleLogoClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    fileInputRef.current?.click();
+  };
+
+  const logoPosition = container.logoPosition || "left";
 
   return (
     <div
@@ -121,6 +145,15 @@ export function TextContainer({
         isResizing && "select-none"
       )}
     >
+      {/* Hidden file input for image upload */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleImageUpload}
+        className="hidden"
+      />
+
       {/* Header with Drag Handle */}
       <div className="flex items-center justify-between px-3 py-2 border-b bg-muted/30 rounded-t-lg overflow-hidden">
         <div className="flex items-center gap-2 flex-1 min-w-0 overflow-hidden">
@@ -134,13 +167,9 @@ export function TextContainer({
           >
             <Move className="h-4 w-4 text-muted-foreground" />
           </div>
-          {container.type === "text" ? (
-            <Type className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-          ) : (
-            <Image className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-          )}
+          <Type className="h-4 w-4 text-muted-foreground flex-shrink-0" />
           <span className="text-sm font-medium truncate flex-1 min-w-0">
-            {container.type === "text" ? "Text Header" : "Logo"}
+            Header
           </span>
         </div>
         <div className="flex items-center gap-1 flex-shrink-0">
@@ -160,55 +189,75 @@ export function TextContainer({
         </div>
       </div>
 
-      {/* Content */}
+      {/* Content - Logo + Text */}
       <div 
-        className="p-4 overflow-hidden flex items-center justify-center"
+        className={cn(
+          "p-4 overflow-hidden flex items-center gap-4",
+          logoPosition === "right" ? "flex-row-reverse" : "flex-row"
+        )}
         style={{ 
-          textAlign: container.textAlign || "center",
           minHeight: container.size.height - 50,
         }}
       >
-        {container.type === "text" ? (
-          isEditing ? (
+        {/* Logo Area */}
+        <div 
+          className="logo-area flex-shrink-0 cursor-pointer group"
+          onClick={handleLogoClick}
+        >
+          {container.logoUrl ? (
+            <div className="relative">
+              <img 
+                src={container.logoUrl} 
+                alt="Logo" 
+                className="h-12 w-auto max-w-[120px] object-contain"
+              />
+              {isSelected && (
+                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded">
+                  <Upload className="h-4 w-4 text-white" />
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className={cn(
+              "h-12 w-12 border-2 border-dashed border-muted-foreground/30 rounded-lg",
+              "flex items-center justify-center hover:border-primary hover:bg-primary/5 transition-colors"
+            )}>
+              <Image className="h-5 w-5 text-muted-foreground/50" />
+            </div>
+          )}
+        </div>
+
+        {/* Text Area */}
+        <div 
+          className="flex-1 min-w-0"
+          style={{ textAlign: container.textAlign || "left" }}
+        >
+          {isEditing ? (
             <Input
               value={container.content}
               onChange={(e) => onUpdate({ content: e.target.value })}
               onBlur={handleBlur}
               onKeyDown={handleKeyDown}
               autoFocus
-              className="text-center border-none bg-transparent focus-visible:ring-0"
+              className="border-none bg-transparent focus-visible:ring-0 p-0"
               style={{
                 fontSize: container.fontSize || 24,
                 fontWeight: container.fontWeight || "bold",
+                textAlign: container.textAlign || "left",
               }}
             />
           ) : (
             <h1
-              className="w-full cursor-text"
+              className="w-full cursor-text truncate"
               style={{
                 fontSize: container.fontSize || 24,
                 fontWeight: container.fontWeight || "bold",
-                textAlign: container.textAlign || "center",
               }}
             >
               {container.content || "Double-click to edit"}
             </h1>
-          )
-        ) : (
-          <div className="flex items-center justify-center h-full">
-            {container.content ? (
-              <img 
-                src={container.content} 
-                alt="Logo" 
-                className="max-w-full max-h-full object-contain"
-              />
-            ) : (
-              <div className="text-muted-foreground text-sm">
-                Add logo URL in settings
-              </div>
-            )}
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Resize Handle */}
