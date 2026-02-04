@@ -18,6 +18,7 @@ export interface CanvasVisualData {
   position: { x: number; y: number };
   size: { width: number; height: number };
   fieldMapping?: FieldMapping;
+  valueFieldNames?: string[];  // Names for legend display in multi-value charts
 }
 
 interface CanvasVisualProps {
@@ -160,7 +161,7 @@ export function CanvasVisual({
           properties={visual.properties}
           onDataClick={onDataClick}
           highlightedValue={highlightedValue}
-          valueFieldNames={visual.fieldMapping?.values?.map(f => f.name)}
+          valueFieldNames={visual.valueFieldNames || visual.fieldMapping?.values?.map(f => f.name)}
         />
         
         {/* Drop indicator overlay */}

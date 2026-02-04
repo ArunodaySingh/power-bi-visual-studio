@@ -844,10 +844,13 @@ function DashboardContent() {
       "Clicks": "clicks",
       "Spend": "spend",
       "Impression": "impressions",
+      "Impressions": "impressions",
       "CTR": "ctr",
       "CPC": "cpc",
       "CPM": "cpm",
       "Leads": "conversions",
+      "Conversions": "conversions",
+      "ROAS": "roas",
     };
 
     const groupByToDbField: Record<string, string> = {
@@ -862,11 +865,14 @@ function DashboardContent() {
 
     // Get database field keys
     const measureKey = measureToDbField[config.measure] || "clicks";
+    const measure2Key = config.measure2 ? (measureToDbField[config.measure2] || null) : null;
     const groupByKey = groupByToDbField[config.groupBy] || "campaign_name";
     const timeGranularity = config.dateGranularity as TimeGranularity;
+    const isMultiLine = visual?.type === "multiline" && measure2Key;
 
     // Aggregate data based on groupBy and date granularity
-    const aggregatedData = new Map<string, { sum: number; count: number }>();
+    // For multiline, we need to aggregate both measures
+    const aggregatedData = new Map<string, { sum: number; count: number; sum2: number; count2: number }>();
 
     metaAdsData.forEach((record) => {
       let groupValue = String(record[groupByKey as keyof typeof record] || "Unknown");
@@ -880,29 +886,52 @@ function DashboardContent() {
       const rawValue = record[measureKey as keyof typeof record];
       const value = typeof rawValue === "number" ? rawValue : 0;
 
+      // Get second measure value if multiline
+      const rawValue2 = measure2Key ? record[measure2Key as keyof typeof record] : 0;
+      const value2 = typeof rawValue2 === "number" ? rawValue2 : 0;
+
       if (!aggregatedData.has(groupValue)) {
-        aggregatedData.set(groupValue, { sum: 0, count: 0 });
+        aggregatedData.set(groupValue, { sum: 0, count: 0, sum2: 0, count2: 0 });
       }
       const entry = aggregatedData.get(groupValue)!;
       entry.sum += value;
       entry.count += 1;
+      entry.sum2 += value2;
+      entry.count2 += 1;
     });
+
+    // Helper to determine if measure is a rate/average field
+    const isRateField = (key: string) => ["ctr", "cpc", "cpm", "roas"].includes(key);
 
     // Create chart data points
     const newData: DataPoint[] = Array.from(aggregatedData.entries())
-      .map(([category, { sum, count }]) => ({
-        id: crypto.randomUUID(),
-        category: category.slice(0, 30),
-        value: Math.round((measureKey === "ctr" || measureKey === "cpc" || measureKey === "cpm" 
-          ? sum / count 
-          : sum) * 100) / 100,
-      }))
+      .map(([category, { sum, count, sum2, count2 }]) => {
+        const dataPoint: DataPoint = {
+          id: crypto.randomUUID(),
+          category: category.slice(0, 30),
+          value: Math.round((isRateField(measureKey) ? sum / count : sum) * 100) / 100,
+        };
+        
+        // Add value2 for multiline charts
+        if (isMultiLine && measure2Key) {
+          dataPoint.value2 = Math.round((isRateField(measure2Key) ? sum2 / count2 : sum2) * 100) / 100;
+        }
+        
+        return dataPoint;
+      })
       .sort((a, b) => b.value - a.value)
       .slice(0, 15); // Limit to top 15 for readability
 
     // Build title
     const timeLabel = config.dateGranularity !== "none" ? ` by ${config.dateGranularity}` : "";
-    const title = `${config.measure} by ${config.groupBy}${timeLabel}`;
+    const title = isMultiLine && config.measure2
+      ? `${config.measure} vs ${config.measure2} by ${config.groupBy}${timeLabel}`
+      : `${config.measure} by ${config.groupBy}${timeLabel}`;
+
+    // Pass value field names for legend
+    const valueFieldNames = isMultiLine && config.measure2
+      ? [config.measure, config.measure2]
+      : [config.measure];
 
     handleUpdateVisual(visualId, {
       data: newData,
@@ -910,9 +939,10 @@ function DashboardContent() {
         ...visual?.properties!,
         title,
       },
+      valueFieldNames,
     });
 
-    toast.success(`Loaded ${config.measure} by ${config.groupBy}${timeLabel}`);
+    toast.success(`Loaded ${title}`);
   }, [metaAdsData, visuals, slotVisuals, handleUpdateVisual, getTimePeriodKey]);
 
   // Handle drag start
