@@ -865,10 +865,11 @@ function DashboardContent() {
 
     // Get database field keys
     const measureKey = measureToDbField[config.measure] || "clicks";
-    const measure2Key = config.measure2 ? (measureToDbField[config.measure2] || null) : null;
+    // For measure2, use fallback to "spend" if not mapped (so multiline still works)
+    const measure2Key = config.measure2 ? (measureToDbField[config.measure2] || "spend") : null;
     const groupByKey = groupByToDbField[config.groupBy] || "campaign_name";
     const timeGranularity = config.dateGranularity as TimeGranularity;
-    const isMultiLine = visual?.type === "multiline" && measure2Key;
+    const isMultiLine = visual?.type === "multiline" && config.measure2;
 
     // Aggregate data based on groupBy and date granularity
     // For multiline, we need to aggregate both measures
