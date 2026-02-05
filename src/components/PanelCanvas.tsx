@@ -15,6 +15,7 @@ interface PanelCanvasProps {
   isComponentDragging?: boolean;
   crossFilterVisualId?: string | null;
   highlightedValue?: string | string[] | null;
+   isPreview?: boolean;
   onSelectPanel: (id: string | null) => void;
   onSelectVisual: (id: string | null) => void;
   onUpdatePanel: (id: string, updates: Partial<PanelData>) => void;
@@ -37,6 +38,7 @@ export function PanelCanvas({
   isComponentDragging,
   crossFilterVisualId,
   highlightedValue,
+   isPreview = false,
   onSelectPanel,
   onSelectVisual,
   onUpdatePanel,
@@ -74,9 +76,9 @@ export function PanelCanvas({
     <div
       ref={setNodeRef}
       className={cn(
-        "relative w-full h-full min-h-[600px] min-w-[800px] transition-colors",
-        isLayoutDragging && "bg-primary/5",
-        isOver && isLayoutDragging && "bg-primary/10 ring-2 ring-inset ring-primary/30 ring-dashed"
+         "relative w-full h-full min-h-[600px] transition-colors",
+         !isPreview && isLayoutDragging && "bg-primary/5",
+         !isPreview && isOver && isLayoutDragging && "bg-primary/10 ring-2 ring-inset ring-primary/30 ring-dashed"
       )}
       onClick={handleCanvasClick}
     >
@@ -111,6 +113,7 @@ export function PanelCanvas({
           isFieldDragging={isFieldDragging}
           isCrossFiltered={crossFilterVisualId !== null && crossFilterVisualId !== visual.id}
           highlightedValue={crossFilterVisualId === visual.id ? null : highlightedValue}
+           isPreview={isPreview}
           onSelect={() => {
             onSelectVisual(visual.id);
             onSelectPanel(null);
@@ -123,7 +126,7 @@ export function PanelCanvas({
       ))}
 
       {/* Drop indicator when dragging layout */}
-      {isLayoutDragging && (
+       {!isPreview && isLayoutDragging && (
         <div className="absolute inset-4 border-2 border-dashed border-primary/40 rounded-xl flex items-center justify-center pointer-events-none">
           <div className="bg-primary/10 text-primary px-4 py-2 rounded-lg text-sm font-medium">
             Drop layout here to add container
@@ -132,7 +135,7 @@ export function PanelCanvas({
       )}
 
       {/* Empty state */}
-      {panels.length === 0 && visuals.length === 0 && !isLayoutDragging && (
+       {panels.length === 0 && visuals.length === 0 && !isLayoutDragging && !isPreview && (
         <div className="absolute inset-0 flex items-center justify-center">
           <div className="text-center space-y-4 max-w-md">
             <div className="w-16 h-16 mx-auto rounded-2xl bg-muted flex items-center justify-center">

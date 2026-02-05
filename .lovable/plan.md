@@ -17,6 +17,10 @@
 - **Matrix Visual**: Row/Column fields (Group By dimensions), Values (Measures)
 - **Grid Lock**: 16px snap-to-grid alignment for visuals, panels, slicers (toggle in toolbar)
 - **Auto-Expand**: Visuals automatically expand to fill available space when dropped (toggle in toolbar)
+- **Fixed A4 Canvas**: Canvas is fixed-width (1240px) with vertical scroll only - no horizontal scroll
+- **Preview Lock Mode**: All elements are non-draggable and non-resizable in Preview mode
+- **Anti-Overlap System**: Elements automatically find valid positions when dropped, preventing overlaps
+- **Alignment Guides**: Dashed lines appear when dragging elements near aligned edges of other elements
 
 ## 🔲 TBD - Future Enhancements
 
