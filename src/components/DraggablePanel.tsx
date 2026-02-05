@@ -165,6 +165,7 @@ interface DraggablePanelProps {
   slotVisuals: Map<string, CanvasVisualData>; // Map of slotId -> visual
   selectedSlotVisualId?: string | null;
   isComponentDragging?: boolean;
+   isPreview?: boolean;
   onSelect: () => void;
   onUpdate: (updates: Partial<PanelData>) => void;
   onDelete: () => void;
@@ -178,6 +179,7 @@ export function DraggablePanel({
   slotVisuals,
   selectedSlotVisualId,
   isComponentDragging,
+   isPreview = false,
   onSelect,
   onUpdate,
   onDelete,
@@ -187,6 +189,7 @@ export function DraggablePanel({
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `panel-${panel.id}`,
     data: { type: "panel", panel },
+     disabled: isPreview,
   });
 
   const [isResizing, setIsResizing] = useState(false);
@@ -231,17 +234,18 @@ export function DraggablePanel({
       style={style}
       onClick={(e) => {
         e.stopPropagation();
-        onSelect();
+         if (!isPreview) onSelect();
       }}
       className={cn(
         "absolute bg-card/80 backdrop-blur-sm rounded-xl border-2 shadow-sm transition-all",
-        isDragging && "shadow-xl ring-2 ring-primary/50 z-50",
-        isSelected ? "border-primary z-40" : "border-border/50",
-        isResizing && "select-none"
+         !isPreview && isDragging && "shadow-xl ring-2 ring-primary/50 z-50",
+         !isPreview && isSelected ? "border-primary z-40" : "border-border/50",
+         !isPreview && isResizing && "select-none"
       )}
     >
       {/* Drag Handle */}
-      <div
+       {!isPreview && (
+         <div
         {...listeners}
         {...attributes}
         className="absolute -top-3 left-1/2 -translate-x-1/2 flex items-center gap-1 px-3 py-1 bg-secondary text-secondary-foreground rounded-full text-xs font-medium cursor-grab active:cursor-grabbing shadow-sm hover:bg-secondary/90 transition-colors z-10"
@@ -249,9 +253,10 @@ export function DraggablePanel({
         <GripVertical className="h-3 w-3" />
         <span className="capitalize">{panel.layoutType.replace("-", " ")}</span>
       </div>
+       )}
 
       {/* Delete Button */}
-      {isSelected && (
+       {!isPreview && isSelected && (
         <Button
           size="icon"
           variant="destructive"
@@ -287,15 +292,17 @@ export function DraggablePanel({
       </div>
 
       {/* Resize Handle */}
-      <div
+       {!isPreview && (
+         <div
         onMouseDown={handleResizeStart}
         className="absolute bottom-0 right-0 w-6 h-6 cursor-se-resize flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
       >
         <Maximize2 className="h-3 w-3 rotate-90" />
       </div>
+       )}
 
       {/* Size indicator when resizing */}
-      {isResizing && (
+       {!isPreview && isResizing && (
         <div className="absolute bottom-8 right-2 px-2 py-1 bg-foreground text-background text-xs rounded font-mono">
           {Math.round(panel.size.width)} × {Math.round(panel.size.height)}
         </div>

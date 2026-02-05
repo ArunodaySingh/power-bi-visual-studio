@@ -91,6 +91,7 @@ export function PanelCanvas({
           slotVisuals={getPanelSlotVisuals(panel)}
           selectedSlotVisualId={selectedVisualId}
           isComponentDragging={isComponentDragging}
+           isPreview={isPreview}
           onSelect={() => {
             onSelectPanel(panel.id);
             onSelectVisual(null);
