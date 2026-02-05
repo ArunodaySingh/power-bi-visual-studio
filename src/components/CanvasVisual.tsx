@@ -28,6 +28,7 @@ interface CanvasVisualProps {
   isCrossFiltered?: boolean;
   highlightedValue?: string | string[] | null;
   gridSize?: number;
+   isPreview?: boolean;
   onSelect: () => void;
   onUpdate: (updates: Partial<CanvasVisualData>) => void;
   onDelete: () => void;
@@ -42,14 +43,16 @@ export function CanvasVisual({
   isCrossFiltered,
   highlightedValue,
   gridSize = 16,
+   isPreview = false,
   onSelect,
   onUpdate,
   onDelete,
   onDuplicate,
   onDataClick,
 }: CanvasVisualProps) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: visual.id,
+     disabled: isPreview,
   });
 
   const { setNodeRef: setDropRef, isOver } = useDroppable({
@@ -110,20 +113,21 @@ export function CanvasVisual({
       style={style}
       onClick={(e) => {
         e.stopPropagation();
-        onSelect();
+         if (!isPreview) onSelect();
       }}
       className={cn(
         "absolute bg-card rounded-xl border shadow-panel transition-all",
-        isDragging && "shadow-xl ring-2 ring-primary/50 z-50",
-        isSelected && "ring-2 ring-primary z-40",
-        isResizing && "select-none",
-        isFieldDragging && "ring-2 ring-dashed ring-muted-foreground/30",
-        showDropIndicator && "ring-2 ring-primary ring-dashed bg-primary/5",
-        isCrossFiltered && "ring-2 ring-accent"
+         !isPreview && isDragging && "shadow-xl ring-2 ring-primary/50 z-50",
+         !isPreview && isSelected && "ring-2 ring-primary z-40",
+         !isPreview && isResizing && "select-none",
+         !isPreview && isFieldDragging && "ring-2 ring-dashed ring-muted-foreground/30",
+         !isPreview && showDropIndicator && "ring-2 ring-primary ring-dashed bg-primary/5",
+         !isPreview && isCrossFiltered && "ring-2 ring-accent"
       )}
     >
       {/* Drag Handle */}
-      <div
+       {!isPreview && (
+         <div
         {...listeners}
         {...attributes}
         className="absolute -top-3 left-1/2 -translate-x-1/2 flex items-center gap-1 px-3 py-1 bg-accent text-accent-foreground rounded-full text-xs font-medium cursor-grab active:cursor-grabbing shadow-sm hover:bg-accent/90 transition-colors z-10"
@@ -131,9 +135,10 @@ export function CanvasVisual({
         <Move className="h-3 w-3" />
         <span>Drag</span>
       </div>
+       )}
 
       {/* Action Buttons - visible when selected */}
-      {isSelected && (
+       {!isPreview && isSelected && (
         <div className="absolute -top-3 right-2 flex items-center gap-1 z-10">
           <Button
             size="icon"
@@ -183,16 +188,18 @@ export function CanvasVisual({
       </div>
 
       {/* Resize Handle */}
-      <div
+       {!isPreview && (
+         <div
         ref={resizeRef}
         onMouseDown={handleResizeStart}
         className="absolute bottom-0 right-0 w-6 h-6 cursor-se-resize flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
       >
         <Maximize2 className="h-3 w-3 rotate-90" />
       </div>
+       )}
 
       {/* Size indicator when resizing */}
-      {isResizing && (
+       {!isPreview && isResizing && (
         <div className="absolute bottom-8 right-2 px-2 py-1 bg-foreground text-background text-xs rounded font-mono">
           {Math.round(visual.size.width)} × {Math.round(visual.size.height)}
         </div>

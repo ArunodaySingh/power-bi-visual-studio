@@ -25,6 +25,7 @@ interface TextContainerProps {
   container: TextContainerData;
   isSelected: boolean;
   canvasWidth?: number;
+   isPreview?: boolean;
   onSelect: () => void;
   onUpdate: (updates: Partial<TextContainerData>) => void;
   onDelete: () => void;
@@ -34,6 +35,7 @@ export function TextContainer({
   container,
   isSelected,
   canvasWidth = 800,
+   isPreview = false,
   onSelect,
   onUpdate,
   onDelete,
@@ -41,6 +43,7 @@ export function TextContainer({
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `text-${container.id}`,
     data: { type: "text-container", container },
+     disabled: isPreview || container.snapToTop || container.matchWidth,
   });
 
   const resizeRef = useRef<HTMLDivElement>(null);
@@ -135,14 +138,14 @@ export function TextContainer({
       style={style}
       onClick={(e) => {
         e.stopPropagation();
-        onSelect();
+         if (!isPreview) onSelect();
       }}
-      onDoubleClick={handleDoubleClick}
+       onDoubleClick={isPreview ? undefined : handleDoubleClick}
       className={cn(
         "absolute bg-background rounded-lg border shadow-sm transition-all",
-        isDragging && "shadow-xl ring-2 ring-primary/50 z-50",
-        isSelected && "ring-2 ring-primary z-40",
-        isResizing && "select-none"
+         !isPreview && isDragging && "shadow-xl ring-2 ring-primary/50 z-50",
+         !isPreview && isSelected && "ring-2 ring-primary z-40",
+         !isPreview && isResizing && "select-none"
       )}
     >
       {/* Hidden file input for image upload */}
@@ -155,7 +158,8 @@ export function TextContainer({
       />
 
       {/* Header with Drag Handle */}
-      <div className="flex items-center justify-between px-3 py-2 border-b bg-muted/30 rounded-t-lg overflow-hidden">
+       {!isPreview && (
+         <div className="flex items-center justify-between px-3 py-2 border-b bg-muted/30 rounded-t-lg overflow-hidden">
         <div className="flex items-center gap-2 flex-1 min-w-0 overflow-hidden">
           <div
             {...listeners}
@@ -188,6 +192,7 @@ export function TextContainer({
           )}
         </div>
       </div>
+       )}
 
       {/* Content - Logo + Text */}
       <div 
@@ -261,7 +266,7 @@ export function TextContainer({
       </div>
 
       {/* Resize Handle */}
-      {!container.matchWidth && (
+       {!isPreview && !container.matchWidth && (
         <div
           ref={resizeRef}
           onMouseDown={handleResizeStart}

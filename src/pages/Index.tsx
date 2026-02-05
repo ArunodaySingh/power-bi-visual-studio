@@ -18,7 +18,7 @@ import { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 
 // UI Icons - Only import what's needed for the current UI
-import { Settings, LayoutGrid, Loader2, Database, RefreshCw, AlertCircle, Save, ArrowLeft, LogOut, Filter, Type, Eye, Grid3X3, Maximize2 } from "lucide-react";
+ import { Settings, LayoutGrid, Loader2, Database, RefreshCw, AlertCircle, Save, ArrowLeft, LogOut, Filter, Type, Eye, Maximize2 } from "lucide-react";
 
 // Drag and drop functionality
 import { DndContext, DragEndEvent, DragStartEvent, useSensor, useSensors, PointerSensor, DragOverlay } from "@dnd-kit/core";
@@ -58,6 +58,9 @@ import { SlicerSettingsPanel } from "@/components/SlicerSettingsPanel";
 // Types
 import type { SlicerType, SlicerData, TimeGranularity } from "@/types/dashboard";
 
+ // Alignment guides
+ import { AlignmentGuides, type AlignmentLine } from "@/components/AlignmentGuides";
+ 
 // Utilities
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -300,12 +303,15 @@ function DashboardContent() {
   const [dashboardDescription, setDashboardDescription] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   
-  // Grid lock state - snaps visuals to 16px grid
-  const [gridLockEnabled, setGridLockEnabled] = useState(true);
+   // Grid is always enabled (no toggle) - snaps visuals to 16px grid
+   const gridLockEnabled = true;
   const [autoExpandEnabled, setAutoExpandEnabled] = useState(false);
   const GRID_SIZE = 16;
-  const CANVAS_WIDTH = 1200; // Default canvas width for expand calculations
-  const CANVAS_HEIGHT = 800; // Default canvas height
+   const A4_WIDTH = 1240; // A4-like fixed width in pixels (210mm at ~6px/mm)
+   const CANVAS_HEIGHT = 1754; // A4 height ratio for vertical scrolling
+   
+   // Alignment guides state
+   const [alignmentLines, setAlignmentLines] = useState<AlignmentLine[]>([]);
   
   // Snap value to grid
   const snapToGrid = useCallback((value: number): number => {
@@ -319,7 +325,7 @@ function DashboardContent() {
     existingVisuals: CanvasVisualData[],
     excludeId?: string
   ): { width: number; height: number } => {
-    let maxWidth = CANVAS_WIDTH - position.x - 50; // Leave some margin
+     let maxWidth = A4_WIDTH - position.x - 50; // Leave some margin
     let maxHeight = CANVAS_HEIGHT - position.y - 50;
     
     // Check collisions with other visuals
@@ -346,6 +352,163 @@ function DashboardContent() {
       height: Math.max(300, snapToGrid(maxHeight)),
     };
   }, [snapToGrid]);
+   
+   // Check for overlapping and find valid drop position
+   const findValidDropPosition = useCallback((
+     position: { x: number; y: number },
+     size: { width: number; height: number },
+     existingVisuals: CanvasVisualData[],
+     existingPanels: PanelData[],
+     existingSlicers: SlicerData[],
+     excludeId?: string
+   ): { x: number; y: number } => {
+     const snappedX = snapToGrid(position.x);
+     const snappedY = snapToGrid(position.y);
+     
+     // Collect all existing elements
+     const allElements = [
+       ...existingVisuals.filter(v => v.id !== excludeId).map(v => ({
+         x: v.position.x,
+         y: v.position.y,
+         width: v.size.width,
+         height: v.size.height,
+       })),
+       ...existingPanels.map(p => ({
+         x: p.position.x,
+         y: p.position.y,
+         width: p.size.width,
+         height: p.size.height,
+       })),
+       ...existingSlicers.map(s => ({
+         x: s.position.x,
+         y: s.position.y,
+         width: s.size.width,
+         height: s.size.height,
+       })),
+     ];
+     
+     // Check if proposed position overlaps with any existing element
+     const wouldOverlap = (testX: number, testY: number) => {
+       return allElements.some(el => {
+         const overlapX = testX < el.x + el.width && testX + size.width > el.x;
+         const overlapY = testY < el.y + el.height && testY + size.height > el.y;
+         return overlapX && overlapY;
+       });
+     };
+     
+     // If no overlap, return snapped position
+     if (!wouldOverlap(snappedX, snappedY)) {
+       return { x: snappedX, y: snappedY };
+     }
+     
+     // Find nearest non-overlapping position by searching outward
+     const maxSearchDistance = 500;
+     for (let distance = GRID_SIZE; distance < maxSearchDistance; distance += GRID_SIZE) {
+       // Try positions in order: right, below, left, above
+       const candidates = [
+         { x: snappedX + distance, y: snappedY },
+         { x: snappedX, y: snappedY + distance },
+         { x: Math.max(0, snappedX - distance), y: snappedY },
+         { x: snappedX, y: Math.max(0, snappedY - distance) },
+       ];
+       
+       for (const candidate of candidates) {
+         if (!wouldOverlap(candidate.x, candidate.y)) {
+           return { x: snapToGrid(candidate.x), y: snapToGrid(candidate.y) };
+         }
+       }
+     }
+     
+     // Fallback: place below all existing elements
+     const maxBottom = allElements.reduce((max, el) => Math.max(max, el.y + el.height), 0);
+     return { x: snapToGrid(snappedX), y: snapToGrid(maxBottom + GRID_SIZE) };
+   }, [snapToGrid, GRID_SIZE]);
+   
+   // Calculate alignment guides when dragging
+   const calculateAlignmentGuides = useCallback((
+     position: { x: number; y: number },
+     size: { width: number; height: number },
+     existingVisuals: CanvasVisualData[],
+     existingPanels: PanelData[],
+     existingSlicers: SlicerData[],
+     excludeId?: string
+   ): AlignmentLine[] => {
+     const lines: AlignmentLine[] = [];
+     const threshold = 8; // pixels threshold for alignment
+     
+     const allElements = [
+       ...existingVisuals.filter(v => v.id !== excludeId).map(v => ({
+         x: v.position.x,
+         y: v.position.y,
+         width: v.size.width,
+         height: v.size.height,
+       })),
+       ...existingPanels.map(p => ({
+         x: p.position.x,
+         y: p.position.y,
+         width: p.size.width,
+         height: p.size.height,
+       })),
+       ...existingSlicers.map(s => ({
+         x: s.position.x,
+         y: s.position.y,
+         width: s.size.width,
+         height: s.size.height,
+       })),
+     ];
+     
+     const dragLeft = position.x;
+     const dragRight = position.x + size.width;
+     const dragTop = position.y;
+     const dragBottom = position.y + size.height;
+     const dragCenterX = position.x + size.width / 2;
+     const dragCenterY = position.y + size.height / 2;
+     
+     allElements.forEach(el => {
+       const elLeft = el.x;
+       const elRight = el.x + el.width;
+       const elTop = el.y;
+       const elBottom = el.y + el.height;
+       const elCenterX = el.x + el.width / 2;
+       const elCenterY = el.y + el.height / 2;
+       
+       // Vertical alignment lines (same X positions)
+       if (Math.abs(dragLeft - elLeft) < threshold) {
+         lines.push({ type: "vertical", position: elLeft, start: Math.min(dragTop, elTop) - 20, end: Math.max(dragBottom, elBottom) + 20 });
+       }
+       if (Math.abs(dragRight - elRight) < threshold) {
+         lines.push({ type: "vertical", position: elRight, start: Math.min(dragTop, elTop) - 20, end: Math.max(dragBottom, elBottom) + 20 });
+       }
+       if (Math.abs(dragCenterX - elCenterX) < threshold) {
+         lines.push({ type: "vertical", position: elCenterX, start: Math.min(dragTop, elTop) - 20, end: Math.max(dragBottom, elBottom) + 20 });
+       }
+       if (Math.abs(dragLeft - elRight) < threshold) {
+         lines.push({ type: "vertical", position: elRight, start: Math.min(dragTop, elTop) - 20, end: Math.max(dragBottom, elBottom) + 20 });
+       }
+       if (Math.abs(dragRight - elLeft) < threshold) {
+         lines.push({ type: "vertical", position: elLeft, start: Math.min(dragTop, elTop) - 20, end: Math.max(dragBottom, elBottom) + 20 });
+       }
+       
+       // Horizontal alignment lines (same Y positions)
+       if (Math.abs(dragTop - elTop) < threshold) {
+         lines.push({ type: "horizontal", position: elTop, start: Math.min(dragLeft, elLeft) - 20, end: Math.max(dragRight, elRight) + 20 });
+       }
+       if (Math.abs(dragBottom - elBottom) < threshold) {
+         lines.push({ type: "horizontal", position: elBottom, start: Math.min(dragLeft, elLeft) - 20, end: Math.max(dragRight, elRight) + 20 });
+       }
+       if (Math.abs(dragCenterY - elCenterY) < threshold) {
+         lines.push({ type: "horizontal", position: elCenterY, start: Math.min(dragLeft, elLeft) - 20, end: Math.max(dragRight, elRight) + 20 });
+       }
+       if (Math.abs(dragTop - elBottom) < threshold) {
+         lines.push({ type: "horizontal", position: elBottom, start: Math.min(dragLeft, elLeft) - 20, end: Math.max(dragRight, elRight) + 20 });
+       }
+       if (Math.abs(dragBottom - elTop) < threshold) {
+         lines.push({ type: "horizontal", position: elTop, start: Math.min(dragLeft, elLeft) - 20, end: Math.max(dragRight, elRight) + 20 });
+       }
+     });
+     
+     return lines;
+   }, []);
 
   // ========== DERIVED STATE ==========
   // Get current sheet's data for easy access
@@ -1063,6 +1226,7 @@ function DashboardContent() {
     setDraggingComponent(null);
     setDraggingSlicerType(null);
     setDraggingTextType(null);
+     setAlignmentLines([]);
 
     // Handle layout drop on canvas
     if (activeId.startsWith("layout-") && over) {
@@ -1119,12 +1283,15 @@ function DashboardContent() {
       const containerId = activeId.replace("text-", "");
       const container = textContainers.find((t) => t.id === containerId);
       if (container && !container.snapToTop && !container.matchWidth) {
-        handleUpdateTextContainer(containerId, {
-          position: {
-            x: snapToGrid(container.position.x + delta.x),
-            y: snapToGrid(container.position.y + delta.y),
-          },
-        });
+         const newPos = findValidDropPosition(
+           { x: container.position.x + delta.x, y: container.position.y + delta.y },
+           container.size,
+           visuals,
+           panels,
+           slicers,
+           containerId
+         );
+         handleUpdateTextContainer(containerId, { position: newPos });
       }
       return;
     }
@@ -1136,12 +1303,15 @@ function DashboardContent() {
       const slicerId = activeId.replace("slicer-", "");
       const slicer = slicers.find((s) => s.id === slicerId);
       if (slicer) {
-        handleUpdateSlicer(slicerId, {
-          position: {
-            x: snapToGrid(slicer.position.x + delta.x),
-            y: snapToGrid(slicer.position.y + delta.y),
-          },
-        });
+         const newPos = findValidDropPosition(
+           { x: slicer.position.x + delta.x, y: slicer.position.y + delta.y },
+           slicer.size,
+           visuals,
+           panels,
+           slicers.filter(s => s.id !== slicerId),
+           slicerId
+         );
+         handleUpdateSlicer(slicerId, { position: newPos });
       }
       return;
     }
@@ -1151,12 +1321,15 @@ function DashboardContent() {
       const panelId = activeId.replace("panel-", "");
       const panel = panels.find((p) => p.id === panelId);
       if (panel) {
-        handleUpdatePanel(panelId, {
-          position: {
-            x: snapToGrid(panel.position.x + delta.x),
-            y: snapToGrid(panel.position.y + delta.y),
-          },
-        });
+         const newPos = findValidDropPosition(
+           { x: panel.position.x + delta.x, y: panel.position.y + delta.y },
+           panel.size,
+           visuals,
+           panels.filter(p => p.id !== panelId),
+           slicers,
+           panelId
+         );
+         handleUpdatePanel(panelId, { position: newPos });
       }
       return;
     }
@@ -1164,12 +1337,15 @@ function DashboardContent() {
     // Handle visual drag
     const visual = visuals.find((v) => v.id === activeId);
     if (visual) {
-      handleUpdateVisual(activeId, {
-        position: {
-          x: snapToGrid(visual.position.x + delta.x),
-          y: snapToGrid(visual.position.y + delta.y),
-        },
-      });
+       const newPos = findValidDropPosition(
+         { x: visual.position.x + delta.x, y: visual.position.y + delta.y },
+         visual.size,
+         visuals.filter(v => v.id !== activeId),
+         panels,
+         slicers,
+         activeId
+       );
+       handleUpdateVisual(activeId, { position: newPos });
     }
   };
 
@@ -1265,15 +1441,6 @@ function DashboardContent() {
                   />
                 )}
                 <Button
-                  variant={gridLockEnabled ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setGridLockEnabled(!gridLockEnabled)}
-                  title={gridLockEnabled ? "Grid Lock: ON (click to disable)" : "Grid Lock: OFF (click to enable)"}
-                >
-                  <Grid3X3 className="h-4 w-4 mr-1" />
-                  Grid
-                </Button>
-                <Button
                   variant={autoExpandEnabled ? "default" : "outline"}
                   size="sm"
                   onClick={() => setAutoExpandEnabled(!autoExpandEnabled)}
@@ -1316,14 +1483,28 @@ function DashboardContent() {
             </div>
 
             {/* Canvas with Slicers and Text Containers */}
-            <div className={`flex-1 p-4 bg-muted/30 overflow-auto relative ${gridLockEnabled ? 'canvas-grid-visible' : ''}`}>
+             <div 
+               className="flex-1 p-4 bg-muted/30 overflow-y-auto overflow-x-hidden relative canvas-grid-visible"
+               style={{ maxWidth: "100%", width: "100%" }}
+             >
+               {/* Fixed-width A4-like canvas container */}
+               <div 
+                 className="relative mx-auto bg-card shadow-lg rounded-lg border"
+                 style={{ width: A4_WIDTH, minHeight: CANVAS_HEIGHT }}
+               >
+                 {/* Alignment Guides */}
+                 <AlignmentGuides 
+                   lines={alignmentLines} 
+                   canvasWidth={A4_WIDTH} 
+                   canvasHeight={CANVAS_HEIGHT} 
+                 />
               {/* Render Text Containers */}
               {textContainers.map((container) => (
                 <TextContainer
                   key={container.id}
                   container={container}
                   isSelected={selectedTextContainerId === container.id}
-                  canvasWidth={800}
+                   canvasWidth={A4_WIDTH}
                   onSelect={() => {
                     setSelectedTextContainerId(container.id);
                     setSelectedPanelId(null);
@@ -1426,6 +1607,7 @@ function DashboardContent() {
                 onRemoveVisualFromSlot={handleRemoveVisualFromSlot}
                 onDataClick={handleVisualDataClick}
               />
+               </div>
             </div>
 
             {/* Sheet Tabs */}
@@ -1597,21 +1779,28 @@ function DashboardContent() {
               Full-screen preview of your dashboard
             </DialogDescription>
           </DialogHeader>
-          <div className="flex-1 p-4 bg-muted/30 canvas-grid overflow-auto relative min-h-[70vh]">
+           <div 
+             className="flex-1 p-4 bg-muted/30 canvas-grid overflow-y-auto overflow-x-hidden relative min-h-[70vh]"
+           >
+             <div 
+               className="relative mx-auto bg-card shadow-lg rounded-lg border"
+               style={{ width: A4_WIDTH, minHeight: CANVAS_HEIGHT }}
+             >
             {/* Render Text Containers in Preview */}
             {textContainers.map((container) => (
               <TextContainer
                 key={container.id}
                 container={container}
                 isSelected={false}
-                canvasWidth={window.innerWidth * 0.9}
-                onSelect={() => {}}
-                onUpdate={() => {}}
-                onDelete={() => {}}
+                 canvasWidth={A4_WIDTH}
+                 onSelect={() => {}} 
+                 onUpdate={() => {}} 
+                 onDelete={() => {}}
+                 isPreview={true}
               />
             ))}
 
-            {/* Render Slicers in Preview */}
+             {/* Render Slicers in Preview (interaction allowed for filtering) */}
             {slicers.map((slicer) => {
               const slicerProps = {
                 slicer,
@@ -1682,6 +1871,7 @@ function DashboardContent() {
               isComponentDragging={false}
               crossFilterVisualId={crossFilter?.sourceVisualId || null}
               highlightedValue={crossFilter?.value || null}
+               isPreview={true}
               onSelectPanel={() => {}}
               onSelectVisual={() => {}}
               onUpdatePanel={() => {}}
@@ -1692,6 +1882,7 @@ function DashboardContent() {
               onRemoveVisualFromSlot={() => {}}
               onDataClick={handleVisualDataClick}
             />
+             </div>
           </div>
         </DialogContent>
       </Dialog>
