@@ -19,6 +19,7 @@ import { useNavigate } from "react-router-dom";
 
 // UI Icons - Only import what's needed for the current UI
  import { Settings, LayoutGrid, Loader2, Database, RefreshCw, AlertCircle, Save, ArrowLeft, LogOut, Filter, Type, Eye, Maximize2 } from "lucide-react";
+ import { PanelLeftClose, PanelLeft, PanelRightClose, PanelRight } from "lucide-react";
 
 // Drag and drop functionality
 import { DndContext, DragEndEvent, DragStartEvent, useSensor, useSensors, PointerSensor, DragOverlay } from "@dnd-kit/core";
@@ -1354,8 +1355,12 @@ function DashboardContent() {
       <div className="h-screen flex flex-col bg-background">
         <div className="flex-1 flex overflow-hidden">
           {/* Left Sidebar - Component & Layout Palette */}
-          {showLeftPanel && (
-            <aside className="w-64 border-r bg-card flex flex-col overflow-hidden">
+             <aside 
+               className={`border-r bg-card flex flex-col overflow-hidden transition-all duration-300 ease-in-out ${
+                 showLeftPanel ? 'w-64 opacity-100' : 'w-0 opacity-0 overflow-hidden'
+               }`}
+             >
+               <div className={`w-64 h-full flex flex-col ${showLeftPanel ? '' : 'invisible'}`}>
               <ComponentPalette 
                 onAddVisual={handleAddVisual} 
                 onAddSlicer={handleAddSlicer}
@@ -1363,11 +1368,11 @@ function DashboardContent() {
                 selectedVisualType={selectedVisual?.type || null}
                 onAddTextContainer={handleAddTextContainer}
               />
+               </div>
             </aside>
-          )}
 
           {/* Main Canvas Area */}
-          <main className="flex-1 flex flex-col overflow-hidden">
+           <main className="flex-1 flex flex-col overflow-hidden transition-all duration-300 ease-in-out">
             {/* Canvas Toolbar */}
             <div className="h-12 border-b bg-card px-4 flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -1427,11 +1432,23 @@ function DashboardContent() {
               </div>
               <div className="flex items-center gap-2">
                 <Button
-                  variant="outline"
+                   variant={showLeftPanel ? "default" : "outline"}
                   size="sm"
                   onClick={() => setShowLeftPanel(!showLeftPanel)}
+                   className="transition-all duration-200"
+                   title={showLeftPanel ? "Hide component palette" : "Show component palette"}
                 >
-                  {showLeftPanel ? "Hide Left" : "Show Left"}
+                   {showLeftPanel ? (
+                     <>
+                       <PanelLeftClose className="h-4 w-4 mr-1.5" />
+                       <span className="hidden sm:inline">Components</span>
+                     </>
+                   ) : (
+                     <>
+                       <PanelLeft className="h-4 w-4 mr-1.5" />
+                       <span className="hidden sm:inline">Components</span>
+                     </>
+                   )}
                 </Button>
                 {selectedVisual && (
                   <CodeExport
@@ -1450,11 +1467,23 @@ function DashboardContent() {
                   Expand
                 </Button>
                 <Button
-                  variant="outline"
+                   variant={showConfigPanel ? "default" : "outline"}
                   size="sm"
                   onClick={() => setShowConfigPanel(!showConfigPanel)}
+                   className="transition-all duration-200"
+                   title={showConfigPanel ? "Hide configuration panel" : "Show configuration panel"}
                 >
-                  {showConfigPanel ? "Hide Right" : "Show Right"}
+                   {showConfigPanel ? (
+                     <>
+                       <span className="hidden sm:inline">Config</span>
+                       <PanelRightClose className="h-4 w-4 ml-1.5" />
+                     </>
+                   ) : (
+                     <>
+                       <span className="hidden sm:inline">Config</span>
+                       <PanelRight className="h-4 w-4 ml-1.5" />
+                     </>
+                   )}
                 </Button>
                 <Button
                   variant="outline"
@@ -1484,12 +1513,11 @@ function DashboardContent() {
 
             {/* Canvas with Slicers and Text Containers */}
              <div 
-               className="flex-1 p-4 bg-muted/30 overflow-y-auto overflow-x-hidden relative canvas-grid-visible"
-               style={{ maxWidth: "100%", width: "100%" }}
+                className="flex-1 p-4 bg-muted/30 overflow-auto relative canvas-grid-visible"
              >
                {/* Fixed-width A4-like canvas container */}
                <div 
-                 className="relative mx-auto bg-card shadow-lg rounded-lg border"
+                  className="relative bg-card shadow-lg rounded-lg border transition-all duration-300"
                  style={{ width: A4_WIDTH, minHeight: CANVAS_HEIGHT }}
                >
                  {/* Alignment Guides */}
@@ -1622,8 +1650,12 @@ function DashboardContent() {
           </main>
 
           {/* Right Sidebar - Data Fields & Config */}
-          {showConfigPanel && (
-            <aside className="w-80 border-l bg-card flex flex-col overflow-hidden">
+             <aside 
+               className={`border-l bg-card flex flex-col overflow-hidden transition-all duration-300 ease-in-out ${
+                 showConfigPanel ? 'w-80 opacity-100' : 'w-0 opacity-0 overflow-hidden'
+               }`}
+             >
+               <div className={`w-80 h-full flex flex-col ${showConfigPanel ? '' : 'invisible'}`}>
               {/* Data Fields panel removed - using dropdown configuration */}
               
               {/* Tabs for Visual/Format */}
@@ -1685,8 +1717,8 @@ function DashboardContent() {
                   )}
                 </TabsContent>
               </Tabs>
+               </div>
             </aside>
-          )}
         </div>
       </div>
 
