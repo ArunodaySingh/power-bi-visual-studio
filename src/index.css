@@ -179,4 +179,20 @@
       linear-gradient(to bottom, hsl(var(--border) / 0.3) 1px, transparent 1px);
     background-size: 16px 16px;
   }
+   
+   /* Smooth panel transitions */
+   .panel-transition {
+     transition: width 300ms ease-in-out, opacity 200ms ease-in-out;
+   }
+   
+   /* Canvas container styling */
+   .canvas-container {
+     background: 
+       radial-gradient(circle at center, hsl(var(--muted) / 0.3) 0%, transparent 70%);
+   }
+   
+   /* Floating action buttons */
+   .floating-action {
+     @apply shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105;
+   }
 }
