@@ -1517,15 +1517,16 @@ function DashboardContent() {
              >
                {/* Fixed-width A4-like canvas container */}
                <div 
-                  className="relative bg-card shadow-lg rounded-lg border transition-all duration-300"
+                   className="relative bg-card shadow-lg rounded-lg border transition-all duration-300 canvas-grid-visible"
                  style={{ width: A4_WIDTH, minHeight: CANVAS_HEIGHT }}
                >
-                 {/* Alignment Guides */}
-                 <AlignmentGuides 
-                   lines={alignmentLines} 
-                   canvasWidth={A4_WIDTH} 
-                   canvasHeight={CANVAS_HEIGHT} 
-                 />
+                  {/* Alignment Guides */}
+                  <AlignmentGuides 
+                    lines={alignmentLines} 
+                    canvasWidth={A4_WIDTH} 
+                    canvasHeight={CANVAS_HEIGHT} 
+                  />
+                  
               {/* Render Text Containers */}
               {textContainers.map((container) => (
                 <TextContainer
