@@ -75,11 +75,10 @@ export function useMetaAdsData() {
   const query = useQuery({
     queryKey: ["meta-ads-campaigns"],
     queryFn: async (): Promise<MetaAdsCampaign[]> => {
-      const { data, error } = await supabase
+      const { data, error, count } = await supabase
         .from("meta_ads_campaigns")
-        .select("*")
-        .order("date", { ascending: false })
-        .limit(1000);
+        .select("*", { count: 'exact' })
+        .order("date", { ascending: false });
 
       if (error) {
         console.error("Error fetching meta ads data:", error);
