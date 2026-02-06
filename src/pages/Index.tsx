@@ -14,7 +14,7 @@
  * - Integrates with Supabase for data fetching and persistence
  */
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 
 // UI Icons - Only import what's needed for the current UI
@@ -51,7 +51,7 @@ import { FilterProvider, useFilters } from "@/contexts/FilterContext";
 import { CrossFilterProvider, useCrossFilter } from "@/contexts/CrossFilterContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useMetaAdsData, getUniqueValues } from "@/hooks/useMetaAdsData";
-import { getColumnDisplayName } from "@/hooks/useMetaAdsSchema";
+import { useMetaAdsSchema, getColumnDisplayName } from "@/hooks/useMetaAdsSchema";
 
 // Slicer components
 import { DropdownSlicer, ListSlicer, DateRangeSlicer, NumericRangeSlicer } from "@/components/slicers";
@@ -255,7 +255,9 @@ function DashboardContent() {
     isFetching: isFetchingMetaAds 
   } = useMetaAdsData();
 
-  // Sign out handler
+  // Fetch schema for default config values
+  const { data: schemaData } = useMetaAdsSchema();
+
   const handleSignOut = async () => {
     await signOut();
     navigate("/");
@@ -297,8 +299,9 @@ function DashboardContent() {
 
   // Chart configuration state - stores measure/groupBy/date for each visual
   const [visualConfigs, setVisualConfigs] = useState<Map<string, ChartConfig>>(new Map());
-
-  // Save dialog state
+  
+  // Track visuals that need default configs applied
+  const pendingDefaultConfigs = useRef<Set<{ id: string; type: VisualType }>>(new Set());
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [showPreviewDialog, setShowPreviewDialog] = useState(false);
   const [dashboardName, setDashboardName] = useState("");
@@ -753,6 +756,9 @@ function DashboardContent() {
     const visualType = (type || "bar") as VisualType;
     const newVisual = createNewVisual(0, visualType);
     
+    // Add to pending default configs for auto-population
+    pendingDefaultConfigs.current.add({ id: newVisual.id, type: visualType });
+    
     setSheets((prev) =>
       prev.map((s) => {
         if (s.id !== activeSheetId) return s;
@@ -850,6 +856,10 @@ function DashboardContent() {
         newVisual.size = expandedSize;
       }
     }
+    
+    // Add to pending default configs for auto-population
+    pendingDefaultConfigs.current.add({ id: newVisual.id, type: visualType });
+    
     setSheets((prev) =>
       prev.map((s) =>
         s.id === activeSheetId ? { ...s, visuals: [...s.visuals, newVisual] } : s
@@ -1220,6 +1230,89 @@ function DashboardContent() {
 
     toast.success(`Loaded ${title}`);
   }, [metaAdsData, visuals, slotVisuals, handleUpdateVisual, getTimePeriodKey]);
+
+  // Effect to apply default configs to newly added visuals
+  useEffect(() => {
+    // Process any pending default configs
+    if (pendingDefaultConfigs.current.size === 0) return;
+    if (!schemaData?.measures?.length || !schemaData?.dimensions?.length) return;
+    if (metaAdsData.length === 0) return;
+    
+    const pending = Array.from(pendingDefaultConfigs.current);
+    pendingDefaultConfigs.current.clear();
+    
+    pending.forEach(({ id, type }) => {
+      // Check if visual still exists and doesn't have a config yet
+      const visual = visuals.find(v => v.id === id) || Array.from(slotVisuals.values()).find(v => v.id === id);
+      if (!visual) return;
+      if (visualConfigs.has(id)) return;
+      
+      // Build default config based on visual type
+      const defaultMeasure = schemaData.measures[0] || "clicks";
+      const defaultDimension = schemaData.dimensions.find(d => d === "campaign_name") || schemaData.dimensions[0] || "campaign_name";
+      
+      let defaultConfig: ChartConfig;
+      
+      switch (type) {
+        case "card":
+          // KPI cards only need measure + calculation
+          defaultConfig = {
+            measure: defaultMeasure,
+            groupBy: "",
+            dateGranularity: "none",
+            calculation: "sum",
+          };
+          break;
+        case "table":
+          // Tables need selected columns
+          defaultConfig = {
+            measure: "",
+            groupBy: "",
+            dateGranularity: "none",
+            selectedColumns: [defaultDimension, defaultMeasure],
+          };
+          break;
+        case "matrix":
+          // Matrix needs measure and row fields
+          defaultConfig = {
+            measure: defaultMeasure,
+            groupBy: "",
+            dateGranularity: "none",
+            matrixRows: [defaultDimension],
+            matrixColumns: [],
+          };
+          break;
+        case "pie":
+          // Pie needs measure and legend (no date)
+          defaultConfig = {
+            measure: defaultMeasure,
+            groupBy: defaultDimension,
+            dateGranularity: "none",
+          };
+          break;
+        case "multiline":
+          // Multi-line needs two measures
+          const secondMeasure = schemaData.measures[1] || schemaData.measures[0] || "spend";
+          defaultConfig = {
+            measure: defaultMeasure,
+            measure2: secondMeasure,
+            groupBy: defaultDimension,
+            dateGranularity: "none",
+          };
+          break;
+        default:
+          // Standard charts (bar, line, area, combo)
+          defaultConfig = {
+            measure: defaultMeasure,
+            groupBy: defaultDimension,
+            dateGranularity: "none",
+          };
+      }
+      
+      // Apply the default config
+      handleChartConfigChange(id, defaultConfig);
+    });
+  }, [visuals, slotVisuals, visualConfigs, schemaData, metaAdsData, handleChartConfigChange]);
 
   // Handle drag start
   const handleDragStart = (event: DragStartEvent) => {
