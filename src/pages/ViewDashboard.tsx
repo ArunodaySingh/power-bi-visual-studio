@@ -11,6 +11,7 @@ import { CrossFilterProvider, useCrossFilter } from "@/contexts/CrossFilterConte
 import { useAuth } from "@/contexts/AuthContext";
 import { useMetaAdsData, getUniqueValues } from "@/hooks/useMetaAdsData";
 import { DropdownSlicer, ListSlicer, DateRangeSlicer, NumericRangeSlicer } from "@/components/slicers";
+import { TextContainer, type TextContainerData } from "@/components/TextContainer";
 import { getGridStyle } from "@/utils/layoutStyles";
 import type { SlicerData } from "@/types/dashboard";
 import type { DataPoint } from "@/components/DataEditor";
@@ -52,6 +53,7 @@ interface SheetData {
   visuals: VisualData[];
   slotVisuals: Record<string, VisualData>;
   slicers: SlicerData[];
+  textContainers?: TextContainerData[];
 }
 
 interface Dashboard {
@@ -251,6 +253,25 @@ function ViewDashboardContent() {
       {/* Main Content */}
       <main className="flex-1 flex flex-col overflow-hidden">
         <div className="flex-1 p-4 bg-muted/30 canvas-grid overflow-auto relative">
+          {/* Fixed-width A4-like canvas container - matches editor */}
+          <div 
+            className="relative mx-auto bg-card shadow-lg rounded-lg border"
+            style={{ width: 1240, minHeight: 1754 }}
+          >
+          {/* Render Text Containers (Headers) */}
+          {activeSheet?.textContainers?.map((container) => (
+            <TextContainer
+              key={container.id}
+              container={container}
+              isSelected={false}
+              canvasWidth={1240}
+              onSelect={() => {}}
+              onUpdate={() => {}}
+              onDelete={() => {}}
+              isPreview={true}
+            />
+          ))}
+          
           {/* Render Slicers */}
           {activeSheet?.slicers.map((slicer) => {
             const slicerProps = {
@@ -390,6 +411,7 @@ function ViewDashboardContent() {
               <p className="text-muted-foreground">This sheet has no visuals</p>
             </div>
           )}
+          </div>
         </div>
 
         {/* Sheet Tabs */}

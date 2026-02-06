@@ -18,8 +18,8 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 
 // UI Icons - Only import what's needed for the current UI
- import { Settings, LayoutGrid, Loader2, Database, RefreshCw, AlertCircle, Save, ArrowLeft, LogOut, Filter, Type, Eye, Maximize2 } from "lucide-react";
- import { PanelLeftClose, PanelLeft, PanelRightClose, PanelRight } from "lucide-react";
+import { Settings, LayoutGrid, Loader2, Database, RefreshCw, AlertCircle, Save, ArrowLeft, LogOut, Filter, Type, Eye, Maximize2, X, Undo2 } from "lucide-react";
+import { PanelLeftClose, PanelLeft, PanelRightClose, PanelRight } from "lucide-react";
 
 // Drag and drop functionality
 import { DndContext, DragEndEvent, DragStartEvent, useSensor, useSensors, PointerSensor, DragOverlay } from "@dnd-kit/core";
@@ -273,6 +273,46 @@ function DashboardContent() {
   ]);
   const [activeSheetId, setActiveSheetId] = useState(sheets[0].id);
   
+  // Undo history - stores previous states for Ctrl+Z
+  const [undoHistory, setUndoHistory] = useState<SheetData[][]>([]);
+  const maxUndoSteps = 30;
+  
+  // Helper to save current state to undo history
+  const saveToUndoHistory = useCallback(() => {
+    setUndoHistory(prev => {
+      const newHistory = [...prev, sheets.map(s => ({
+        ...s,
+        slotVisuals: new Map(s.slotVisuals),
+      }))];
+      // Limit history size
+      return newHistory.slice(-maxUndoSteps);
+    });
+  }, [sheets]);
+  
+  // Undo function - restore previous state
+  const handleUndo = useCallback(() => {
+    if (undoHistory.length === 0) return;
+    
+    const previousState = undoHistory[undoHistory.length - 1];
+    setSheets(previousState.map(s => ({
+      ...s,
+      slotVisuals: new Map(s.slotVisuals),
+    })));
+    setUndoHistory(prev => prev.slice(0, -1));
+  }, [undoHistory]);
+  
+  // Listen for Ctrl+Z keyboard shortcut
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "z" && !e.shiftKey) {
+        e.preventDefault();
+        handleUndo();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [handleUndo]);
+  
   // Selection state - tracks which element is currently selected
   const [selectedPanelId, setSelectedPanelId] = useState<string | null>(null);
   const [selectedVisualId, setSelectedVisualId] = useState<string | null>(null);
@@ -317,7 +357,7 @@ function DashboardContent() {
    
    // Alignment guides state
    const [alignmentLines, setAlignmentLines] = useState<AlignmentLine[]>([]);
-  
+
   // Snap value to grid
   const snapToGrid = useCallback((value: number): number => {
     if (!gridLockEnabled) return value;
@@ -623,6 +663,7 @@ function DashboardContent() {
 
   // Panel handlers
   const handleAddPanel = useCallback((layoutType: LayoutType, position?: { x: number; y: number }) => {
+    saveToUndoHistory();
     const newPanel = createNewPanel(layoutType, panels.length);
     if (position) {
       newPanel.position = position;
@@ -635,7 +676,7 @@ function DashboardContent() {
     setSelectedPanelId(newPanel.id);
     setSelectedVisualId(null);
     toast.success(`Added ${layoutType.replace("-", " ")} layout`);
-  }, [panels.length, activeSheetId]);
+  }, [panels.length, activeSheetId, saveToUndoHistory]);
 
   const handleUpdatePanel = useCallback((id: string, updates: Partial<PanelData>) => {
     setSheets((prev) =>
@@ -648,16 +689,18 @@ function DashboardContent() {
   }, [activeSheetId]);
 
   const handleDeletePanel = useCallback((id: string) => {
+    saveToUndoHistory();
     setSheets((prev) =>
       prev.map((s) =>
         s.id === activeSheetId ? { ...s, panels: s.panels.filter((p) => p.id !== id) } : s
       )
     );
     setSelectedPanelId((prev) => (prev === id ? null : prev));
-  }, [activeSheetId]);
+  }, [activeSheetId, saveToUndoHistory]);
 
   // Slicer handlers
   const handleAddSlicer = useCallback((type: SlicerType, position?: { x: number; y: number }) => {
+    saveToUndoHistory();
     const defaultField = getDefaultSlicerField(type);
     const newSlicer = createNewSlicer(type, defaultField.field, defaultField.label, slicers.length);
     if (position) {
@@ -673,7 +716,7 @@ function DashboardContent() {
     setSelectedPanelId(null);
     setSelectedVisualId(null);
     toast.success(`Added ${type} slicer`);
-  }, [slicers.length, activeSheetId]);
+  }, [slicers.length, activeSheetId, saveToUndoHistory]);
 
   const handleUpdateSlicer = useCallback((id: string, updates: Partial<SlicerData>) => {
     setSheets((prev) =>
@@ -702,6 +745,7 @@ function DashboardContent() {
   }, [activeSheetId, slicers, addFilter, removeFilter]);
 
   const handleDeleteSlicer = useCallback((id: string) => {
+    saveToUndoHistory();
     const slicer = slicers.find((s) => s.id === id);
     if (slicer) {
       removeFilter(slicer.field);
@@ -712,10 +756,11 @@ function DashboardContent() {
       )
     );
     setSelectedSlicerId((prev) => (prev === id ? null : prev));
-  }, [activeSheetId, slicers, removeFilter]);
+  }, [activeSheetId, slicers, removeFilter, saveToUndoHistory]);
 
   // Text container handlers
   const handleAddTextContainer = useCallback((position?: { x: number; y: number }) => {
+    saveToUndoHistory();
     const newContainer = createNewTextContainer();
     if (position) {
       newContainer.position = position;
@@ -730,7 +775,7 @@ function DashboardContent() {
     setSelectedVisualId(null);
     setSelectedSlicerId(null);
     toast.success("Added header");
-  }, [activeSheetId]);
+  }, [activeSheetId, saveToUndoHistory]);
 
   const handleUpdateTextContainer = useCallback((id: string, updates: Partial<TextContainerData>) => {
     setSheets((prev) =>
@@ -743,16 +788,18 @@ function DashboardContent() {
   }, [activeSheetId]);
 
   const handleDeleteTextContainer = useCallback((id: string) => {
+    saveToUndoHistory();
     setSheets((prev) =>
       prev.map((s) =>
         s.id === activeSheetId ? { ...s, textContainers: s.textContainers.filter((t) => t.id !== id) } : s
       )
     );
     setSelectedTextContainerId((prev) => (prev === id ? null : prev));
-  }, [activeSheetId]);
+  }, [activeSheetId, saveToUndoHistory]);
 
   // Visual to slot handlers
   const handleAddVisualToSlot = useCallback((panelId: string, slotId: string, type: VisualizationType) => {
+    saveToUndoHistory();
     const visualType = (type || "bar") as VisualType;
     const newVisual = createNewVisual(0, visualType);
     
@@ -783,9 +830,10 @@ function DashboardContent() {
     setSelectedVisualId(newVisual.id);
     setSelectedPanelId(null);
     toast.success(`Added ${visualType} chart to panel`);
-  }, [activeSheetId]);
+  }, [activeSheetId, saveToUndoHistory]);
 
   const handleRemoveVisualFromSlot = useCallback((panelId: string, slotId: string) => {
+    saveToUndoHistory();
     setSheets((prev) =>
       prev.map((s) => {
         if (s.id !== activeSheetId) return s;
@@ -811,7 +859,7 @@ function DashboardContent() {
         return { ...s, panels: updatedPanels, slotVisuals: newSlotVisuals };
       })
     );
-  }, [activeSheetId, selectedVisualId]);
+  }, [activeSheetId, selectedVisualId, saveToUndoHistory]);
 
   // Update visual (works for both standalone and slot visuals)
   const handleUpdateVisual = useCallback((id: string, updates: Partial<CanvasVisualData>) => {
@@ -842,6 +890,7 @@ function DashboardContent() {
 
   // Visual handlers for standalone visuals
   const handleAddVisual = useCallback((type?: VisualizationType, position?: { x: number; y: number }) => {
+    saveToUndoHistory();
     const visualType = (type || "bar") as VisualType;
     const newVisual = createNewVisual(visuals.length, visualType);
     if (position) {
@@ -868,18 +917,20 @@ function DashboardContent() {
     setSelectedVisualId(newVisual.id);
     setSelectedPanelId(null);
     toast.success(`Added ${visualType} chart`);
-  }, [visuals, activeSheetId, snapToGrid, autoExpandEnabled, calculateAvailableSpace]);
+  }, [visuals, activeSheetId, snapToGrid, autoExpandEnabled, calculateAvailableSpace, saveToUndoHistory]);
 
   const handleDeleteVisual = useCallback((id: string) => {
+    saveToUndoHistory();
     setSheets((prev) =>
       prev.map((s) =>
         s.id === activeSheetId ? { ...s, visuals: s.visuals.filter((v) => v.id !== id) } : s
       )
     );
     setSelectedVisualId((prev) => (prev === id ? null : prev));
-  }, [activeSheetId]);
+  }, [activeSheetId, saveToUndoHistory]);
 
   const handleDuplicateVisual = useCallback((id: string) => {
+    saveToUndoHistory();
     const visual = visuals.find((v) => v.id === id);
     if (visual) {
       const duplicate: CanvasVisualData = {
@@ -895,7 +946,7 @@ function DashboardContent() {
       );
       setSelectedVisualId(duplicate.id);
     }
-  }, [visuals, activeSheetId]);
+  }, [visuals, activeSheetId, saveToUndoHistory]);
 
   // ========== VISUAL UPDATE HANDLERS ==========
   
@@ -1613,6 +1664,16 @@ function DashboardContent() {
                 <Button
                   variant="outline"
                   size="sm"
+                  onClick={handleUndo}
+                  disabled={undoHistory.length === 0}
+                  title="Undo (Ctrl+Z)"
+                >
+                  <Undo2 className="h-4 w-4 mr-1" />
+                  Undo
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => setShowPreviewDialog(true)}
                 >
                   <Eye className="h-4 w-4 mr-2" />
@@ -1782,7 +1843,19 @@ function DashboardContent() {
                }`}
              >
                <div className={`w-80 h-full flex flex-col ${showConfigPanel ? '' : 'invisible'}`}>
-              {/* Data Fields panel removed - using dropdown configuration */}
+              {/* Panel Header with Close Button */}
+              <div className="flex items-center justify-between px-4 py-2 border-b">
+                <span className="text-sm font-medium">Configuration</span>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-6 w-6" 
+                  onClick={() => setShowConfigPanel(false)}
+                  title="Close panel"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
               
               {/* Tabs for Visual/Format */}
               <Tabs defaultValue="visual" className="flex-1 flex flex-col overflow-hidden">
