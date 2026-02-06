@@ -51,6 +51,7 @@ import { FilterProvider, useFilters } from "@/contexts/FilterContext";
 import { CrossFilterProvider, useCrossFilter } from "@/contexts/CrossFilterContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useMetaAdsData, getUniqueValues } from "@/hooks/useMetaAdsData";
+import { getColumnDisplayName } from "@/hooks/useMetaAdsSchema";
 
 // Slicer components
 import { DropdownSlicer, ListSlicer, DateRangeSlicer, NumericRangeSlicer } from "@/components/slicers";
@@ -901,51 +902,13 @@ function DashboardContent() {
   // Field-drop handler removed - using dropdown configuration instead
 
   // Get available values for slicer field from database
+  // Field comes directly as database column name from the schema
   const getSlicerValues = (field: string): (string | number)[] => {
     if (metaAdsData.length === 0) return [];
     
-    // Map slicer field names to database column names
-    const fieldKeyMap: Record<string, keyof typeof metaAdsData[0]> = {
-      // Legacy field names
-      campaignName: "campaign_name",
-      adSetName: "ad_set_name",
-      date: "date",
-      impressions: "impressions",
-      clicks: "clicks",
-      spend: "spend",
-      conversions: "conversions",
-      ctr: "ctr",
-      cpc: "cpc",
-      cpm: "cpm",
-      roas: "roas",
-      // Group By dimensions
-      "Campaign Name": "campaign_name",
-      "Ad Set Name": "ad_set_name",
-      "Platform": "campaign_name", // Placeholder - using campaign_name as proxy
-      "Campaign Category": "campaign_name",
-      "Ad Category": "campaign_name",
-      "Ad Format": "campaign_name",
-      "Ad Name": "campaign_name",
-      "Ad Set Label": "ad_set_name",
-      "Ad Set Type": "ad_set_name",
-      "Ad Type": "campaign_name",
-      "Age": "campaign_name",
-      "Campaign Label": "campaign_name",
-      "Campaign Type": "campaign_name",
-      "Device": "campaign_name",
-      "Gender": "campaign_name",
-      // Measures (for numeric range)
-      "Clicks": "clicks",
-      "Spend": "spend",
-      "Impressions": "impressions",
-      "CTR": "ctr",
-      "CPC": "cpc",
-      "CPM": "cpm",
-      "Conversions": "conversions",
-      "ROAS": "roas",
-    };
-    
-    const dbField = fieldKeyMap[field] || field as keyof typeof metaAdsData[0];
+    // Field is now the actual database column name from the dynamic schema
+    // Just use it directly
+    const dbField = field as keyof typeof metaAdsData[0];
     return getUniqueValues(metaAdsData, dbField);
   };
 
@@ -1006,42 +969,19 @@ function DashboardContent() {
         return;
       }
 
-      // Map UI column names to database field names
-      const columnToDbField: Record<string, string> = {
-        // Measures
-        "Clicks": "clicks",
-        "Spend": "spend",
-        "Impressions": "impressions",
-        "Impression": "impressions",
-        "CTR": "ctr",
-        "CPC": "cpc",
-        "CPM": "cpm",
-        "Conversions": "conversions",
-        "ROAS": "roas",
-        "Leads": "conversions",
-        // Dimensions
-        "Campaign Name": "campaign_name",
-        "Ad Set Name": "ad_set_name",
-        "Ad Name": "ad_set_name",
-        "Platform": "campaign_name",
-        "Device": "campaign_name",
-        "Age": "campaign_name",
-        "Gender": "campaign_name",
-      };
-
-      // Build table data with selected columns only
-      const tableData = metaAdsData.slice(0, 50).map((record) => {
+      // Build table data with selected columns - use actual DB column names directly
+      const tableData = metaAdsData.slice(0, 100).map((record) => {
         const row: Record<string, string | number> = { id: crypto.randomUUID() };
         selectedColumns.forEach((col) => {
-          const dbField = columnToDbField[col] || col.toLowerCase().replace(/ /g, '_');
-          const value = record[dbField as keyof typeof record];
-          row[col] = value !== undefined ? value : '';
+          // Use column name directly as it comes from the schema
+          const value = record[col as keyof typeof record];
+          row[col] = value !== undefined && value !== null ? value : '';
         });
         // Add category and value for compatibility with DataPoint
-        const firstDim = selectedColumns.find(c => columnToDbField[c] && ["campaign_name", "ad_set_name"].includes(columnToDbField[c]));
-        const firstMeasure = selectedColumns.find(c => columnToDbField[c] && ["clicks", "spend", "impressions", "ctr", "cpc", "cpm", "conversions", "roas"].includes(columnToDbField[c]));
-        row.category = firstDim ? String(row[firstDim]) : String(record.campaign_name);
-        row.value = firstMeasure ? Number(row[firstMeasure]) : 0;
+        const firstDimCol = selectedColumns.find(c => typeof record[c as keyof typeof record] === 'string');
+        const firstMeasureCol = selectedColumns.find(c => typeof record[c as keyof typeof record] === 'number');
+        row.category = firstDimCol ? String(record[firstDimCol as keyof typeof record]) : String(record.campaign_name);
+        row.value = firstMeasureCol ? Number(record[firstMeasureCol as keyof typeof record]) : 0;
         return row as DataPoint;
       });
 
@@ -1057,38 +997,128 @@ function DashboardContent() {
       return;
     }
 
+    // Handle KPI card type - only needs measure, no groupBy
+    if (visual?.type === "card") {
+      if (!config.measure || metaAdsData.length === 0) {
+        handleUpdateVisual(visualId, { data: [] });
+        return;
+      }
+      
+      const measureKey = config.measure;
+      const calculation = config.calculation || "sum";
+      
+      // Calculate aggregate value based on calculation type
+      let aggregateValue = 0;
+      const values = metaAdsData
+        .map(r => r[measureKey as keyof typeof r])
+        .filter((v): v is number => typeof v === 'number');
+      
+      if (values.length > 0) {
+        switch (calculation) {
+          case "sum":
+            aggregateValue = values.reduce((a, b) => a + b, 0);
+            break;
+          case "average":
+            aggregateValue = values.reduce((a, b) => a + b, 0) / values.length;
+            break;
+          case "min":
+            aggregateValue = Math.min(...values);
+            break;
+          case "max":
+            aggregateValue = Math.max(...values);
+            break;
+          case "count":
+            aggregateValue = values.length;
+            break;
+          case "last":
+            aggregateValue = values[0]; // Data is ordered by date descending
+            break;
+        }
+      }
+      
+      const measureDisplayName = getColumnDisplayName(config.measure);
+      const calcLabel = calculation.charAt(0).toUpperCase() + calculation.slice(1);
+      
+      handleUpdateVisual(visualId, {
+        data: [{
+          id: crypto.randomUUID(),
+          category: measureDisplayName,
+          value: Math.round(aggregateValue * 100) / 100,
+        }],
+        properties: {
+          ...visual.properties,
+          title: `${calcLabel} of ${measureDisplayName}`,
+        },
+      });
+      
+      toast.success(`Loaded ${calcLabel} of ${measureDisplayName}`);
+      return;
+    }
+
+    // Handle matrix type - uses matrixRows, matrixColumns, and measure
+    if (visual?.type === "matrix") {
+      if (!config.measure || metaAdsData.length === 0) {
+        handleUpdateVisual(visualId, { data: [] });
+        return;
+      }
+      
+      const measureKey = config.measure;
+      const rowFields = config.matrixRows || [];
+      const colFields = config.matrixColumns || [];
+      
+      // Aggregate by combined row/column grouping
+      const aggregatedData = new Map<string, { sum: number; count: number }>();
+      
+      metaAdsData.forEach((record) => {
+        // Build group key from row and column dimensions
+        const rowParts = rowFields.map(f => String(record[f as keyof typeof record] || "Unknown"));
+        const colParts = colFields.map(f => String(record[f as keyof typeof record] || "Unknown"));
+        const groupKey = [...rowParts, ...colParts].join(" | ") || "Total";
+        
+        const rawValue = record[measureKey as keyof typeof record];
+        const value = typeof rawValue === "number" ? rawValue : 0;
+        
+        if (!aggregatedData.has(groupKey)) {
+          aggregatedData.set(groupKey, { sum: 0, count: 0 });
+        }
+        const entry = aggregatedData.get(groupKey)!;
+        entry.sum += value;
+        entry.count += 1;
+      });
+      
+      const isRateField = ["ctr", "cpc", "cpm", "roas"].includes(measureKey);
+      
+      const matrixData: DataPoint[] = Array.from(aggregatedData.entries())
+        .map(([category, { sum, count }]) => ({
+          id: crypto.randomUUID(),
+          category: category.slice(0, 50),
+          value: Math.round((isRateField ? sum / count : sum) * 100) / 100,
+        }))
+        .sort((a, b) => b.value - a.value)
+        .slice(0, 50);
+      
+      const measureDisplayName = getColumnDisplayName(config.measure);
+      
+      handleUpdateVisual(visualId, {
+        data: matrixData,
+        properties: {
+          ...visual.properties,
+          title: `Matrix: ${measureDisplayName}`,
+        },
+      });
+      
+      toast.success(`Loaded matrix data`);
+      return;
+    }
+
     // For other chart types, require measure and groupBy
     if (!config.measure || !config.groupBy || metaAdsData.length === 0) return;
 
-    // Map UI dropdown values to database column names
-    const measureToDbField: Record<string, string> = {
-      "Clicks": "clicks",
-      "Spend": "spend",
-      "Impression": "impressions",
-      "Impressions": "impressions",
-      "CTR": "ctr",
-      "CPC": "cpc",
-      "CPM": "cpm",
-      "Leads": "conversions",
-      "Conversions": "conversions",
-      "ROAS": "roas",
-    };
-
-    const groupByToDbField: Record<string, string> = {
-      "Campaign Name": "campaign_name",
-      "Ad Set Name": "ad_set_name",
-      "Ad Name": "ad_set_name",
-      "Platform": "campaign_name",
-      "Device": "campaign_name",
-      "Age": "campaign_name",
-      "Gender": "campaign_name",
-    };
-
-    // Get database field keys
-    const measureKey = measureToDbField[config.measure] || "clicks";
-    // For measure2, use fallback to "spend" if not mapped (so multiline still works)
-    const measure2Key = config.measure2 ? (measureToDbField[config.measure2] || "spend") : null;
-    const groupByKey = groupByToDbField[config.groupBy] || "campaign_name";
+    // Use column names directly - they now come from the dynamic schema
+    // and are already the actual database column names
+    const measureKey = config.measure;
+    const measure2Key = config.measure2 || null;
+    const groupByKey = config.groupBy;
     const timeGranularity = config.dateGranularity as TimeGranularity;
     const isMultiLine = visual?.type === "multiline" && config.measure2;
 
@@ -1122,8 +1152,8 @@ function DashboardContent() {
       entry.count2 += 1;
     });
 
-    // Helper to determine if measure is a rate/average field
-    const isRateField = (key: string) => ["ctr", "cpc", "cpm", "roas"].includes(key);
+    // Helper to determine if measure is a rate/average field (should be averaged, not summed)
+    const isRateField = (key: string) => ["ctr", "cpc", "cpm", "roas", "cpv", "cpcv", "vtr", "cpe", "cpl", "engagement_rate", "frequency", "measurable_rate", "viewability_rate", "viewability_rate_verification"].includes(key);
 
     // Create chart data points
     let newData: DataPoint[] = Array.from(aggregatedData.entries())
@@ -1166,16 +1196,18 @@ function DashboardContent() {
     // Limit to top 15 for readability
     newData = newData.slice(0, 15);
 
-    // Build title
+    // Build title using display names for readability
+    const measureDisplayName = getColumnDisplayName(config.measure);
+    const groupByDisplayName = getColumnDisplayName(config.groupBy);
     const timeLabel = config.dateGranularity !== "none" ? ` by ${config.dateGranularity}` : "";
     const title = isMultiLine && config.measure2
-      ? `${config.measure} vs ${config.measure2} by ${config.groupBy}${timeLabel}`
-      : `${config.measure} by ${config.groupBy}${timeLabel}`;
+      ? `${measureDisplayName} vs ${getColumnDisplayName(config.measure2)} by ${groupByDisplayName}${timeLabel}`
+      : `${measureDisplayName} by ${groupByDisplayName}${timeLabel}`;
 
-    // Pass value field names for legend
+    // Pass value field names for legend (use display names)
     const valueFieldNames = isMultiLine && config.measure2
-      ? [config.measure, config.measure2]
-      : [config.measure];
+      ? [measureDisplayName, getColumnDisplayName(config.measure2)]
+      : [measureDisplayName];
 
     handleUpdateVisual(visualId, {
       data: newData,
