@@ -7,70 +7,20 @@
  * - Table: Select Columns (multi-select)
  * - Card/KPI: Measure, Calculation
  * - Pie: Measure, Legend (GroupBy), no date
+ * 
+ * DYNAMIC: Measures and Dimensions are fetched from the database schema
  */
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { BarChart3, Check } from "lucide-react";
+import { BarChart3, Loader2 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useMetaAdsSchema, getColumnDisplayName } from "@/hooks/useMetaAdsSchema";
 
 // ============================================================================
-// CONSTANTS - Meta Ads Metrics and Dimensions
+// CONSTANTS - Date and Calculation Types (static)
 // ============================================================================
-
-export const metaMetrics = [
-  "100% Video View",
-  "25% Video View",
-  "50% Video View",
-  "75% Video View",
-  "Brand Suitability Blocked Ads",
-  "Brand Suitability Failed Ads",
-  "Clicks",
-  "CPC",
-  "CPCV",
-  "CPE",
-  "CPL",
-  "CPM",
-  "CPV",
-  "CTR",
-  "Engagement Rate",
-  "Engagements",
-  "Impression",
-  "Impressions (Verification)",
-  "Landing Page View",
-  "Leads",
-  "Measurable Impressions (Verification)",
-  "Measurable Rate (Verification)",
-  "Spend",
-  "Thruplays",
-  "Tracked Ads",
-  "Video Spend",
-  "Video Starts",
-  "Video Views",
-  "Viewability Impressions (Verification)",
-  "Viewability Rate",
-  "Viewabillity Rate (Verification)",
-  "VTR",
-] as const;
-
-export const groupByDimensions = [
-  "Ad Category",
-  "Ad Format",
-  "Ad Name",
-  "Ad Set Label",
-  "Ad Set Name",
-  "Ad Set Type",
-  "Ad Type",
-  "Age",
-  "Campaign Category",
-  "Campaign Label",
-  "Campaign Name",
-  "Campaign Type",
-  "Device",
-  "Gender",
-  "Platform",
-] as const;
 
 export const dateGranularities = [
   { value: "none", label: "No Date Split" },
@@ -102,22 +52,20 @@ export const sortOptions = [
 // TYPES
 // ============================================================================
 
-export type MetaMetric = typeof metaMetrics[number];
-export type GroupByDimension = typeof groupByDimensions[number];
 export type DateGranularity = typeof dateGranularities[number]["value"];
 export type CalculationType = typeof calculationTypes[number]["value"];
 export type SortOption = typeof sortOptions[number]["value"];
 
 export interface ChartConfig {
-  measure: MetaMetric | "";
-  measure2?: MetaMetric | "";  // For multi-line charts
-  groupBy: GroupByDimension | "";
+  measure: string;
+  measure2?: string;  // For multi-line charts
+  groupBy: string;
   dateGranularity: DateGranularity;
   calculation?: CalculationType;  // For KPI cards
   selectedColumns?: string[];  // For tables
   sortBy?: SortOption;  // For sorting data
-  matrixRows?: GroupByDimension[];  // For matrix - row dimensions
-  matrixColumns?: GroupByDimension[];  // For matrix - column dimensions
+  matrixRows?: string[];  // For matrix - row dimensions
+  matrixColumns?: string[];  // For matrix - column dimensions
 }
 
 // ============================================================================
@@ -135,23 +83,29 @@ interface ChartConfigDropdownsProps {
 // ============================================================================
 
 export function ChartConfigDropdowns({ config, onChange, visualType }: ChartConfigDropdownsProps) {
+  const { data: schema, isLoading } = useMetaAdsSchema();
+  
   const isPieChart = visualType === "pie";
   const isMultiLineChart = visualType === "multiline";
   const isTableChart = visualType === "table";
   const isCardChart = visualType === "card";
   const isMatrixChart = visualType === "matrix";
-  const isStandardChart = ["bar", "line", "area", "combo", "waterfall", "treemap", "funnel", "scatter"].includes(visualType || "");
+
+  // Dynamic measures and dimensions from database
+  const metaMetrics = schema?.measures || [];
+  const groupByDimensions = schema?.dimensions || [];
+  const allColumns = schema?.allColumns || [];
 
   const handleMeasureChange = (value: string) => {
-    onChange({ ...config, measure: value as MetaMetric });
+    onChange({ ...config, measure: value });
   };
 
   const handleMeasure2Change = (value: string) => {
-    onChange({ ...config, measure2: value as MetaMetric });
+    onChange({ ...config, measure2: value });
   };
 
   const handleGroupByChange = (value: string) => {
-    onChange({ ...config, groupBy: value as GroupByDimension });
+    onChange({ ...config, groupBy: value });
   };
 
   const handleDateChange = (value: string) => {
@@ -176,22 +130,29 @@ export function ChartConfigDropdowns({ config, onChange, visualType }: ChartConf
 
   const handleMatrixRowToggle = (dim: string) => {
     const current = config.matrixRows || [];
-    const updated = current.includes(dim as GroupByDimension)
+    const updated = current.includes(dim)
       ? current.filter(d => d !== dim)
-      : [...current, dim as GroupByDimension];
+      : [...current, dim];
     onChange({ ...config, matrixRows: updated });
   };
 
   const handleMatrixColumnToggle = (dim: string) => {
     const current = config.matrixColumns || [];
-    const updated = current.includes(dim as GroupByDimension)
+    const updated = current.includes(dim)
       ? current.filter(d => d !== dim)
-      : [...current, dim as GroupByDimension];
+      : [...current, dim];
     onChange({ ...config, matrixColumns: updated });
   };
 
-  // All available columns for table = measures + dimensions
-  const allColumns = [...metaMetrics, ...groupByDimensions];
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        <span className="ml-2 text-sm text-muted-foreground">Loading schema...</span>
+      </div>
+    );
+  }
 
   // ========== MATRIX CONFIG ==========
   if (isMatrixChart) {
@@ -215,7 +176,7 @@ export function ChartConfigDropdowns({ config, onChange, visualType }: ChartConf
             <SelectContent className="max-h-[300px]">
               {metaMetrics.map((metric) => (
                 <SelectItem key={metric} value={metric}>
-                  {metric}
+                  {getColumnDisplayName(metric)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -236,7 +197,7 @@ export function ChartConfigDropdowns({ config, onChange, visualType }: ChartConf
                     onCheckedChange={() => handleMatrixRowToggle(dim)}
                   />
                   <label htmlFor={`row-${dim}`} className="text-sm cursor-pointer">
-                    {dim}
+                    {getColumnDisplayName(dim)}
                   </label>
                 </div>
               ))}
@@ -258,7 +219,7 @@ export function ChartConfigDropdowns({ config, onChange, visualType }: ChartConf
                     onCheckedChange={() => handleMatrixColumnToggle(dim)}
                   />
                   <label htmlFor={`col-${dim}`} className="text-sm cursor-pointer">
-                    {dim}
+                    {getColumnDisplayName(dim)}
                   </label>
                 </div>
               ))}
@@ -269,7 +230,7 @@ export function ChartConfigDropdowns({ config, onChange, visualType }: ChartConf
         {config.measure && ((config.matrixRows?.length || 0) > 0 || (config.matrixColumns?.length || 0) > 0) && (
           <div className="pt-3 border-t">
             <p className="text-sm text-muted-foreground">
-              Showing <span className="font-medium text-foreground">{config.measure}</span>
+              Showing <span className="font-medium text-foreground">{getColumnDisplayName(config.measure)}</span>
               {(config.matrixRows?.length || 0) > 0 && (
                 <> by <span className="font-medium text-foreground">{config.matrixRows?.length} row(s)</span></>
               )}
@@ -305,7 +266,7 @@ export function ChartConfigDropdowns({ config, onChange, visualType }: ChartConf
             <SelectContent className="max-h-[300px]">
               {metaMetrics.map((metric) => (
                 <SelectItem key={metric} value={metric}>
-                  {metric}
+                  {getColumnDisplayName(metric)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -334,7 +295,7 @@ export function ChartConfigDropdowns({ config, onChange, visualType }: ChartConf
           <div className="pt-3 border-t">
             <p className="text-sm text-muted-foreground">
               Showing <span className="font-medium text-foreground">{config.calculation || "Sum"}</span> of{" "}
-              <span className="font-medium text-foreground">{config.measure}</span>
+              <span className="font-medium text-foreground">{getColumnDisplayName(config.measure)}</span>
             </p>
           </div>
         )}
@@ -359,7 +320,7 @@ export function ChartConfigDropdowns({ config, onChange, visualType }: ChartConf
           </Label>
           <ScrollArea className="h-[300px] border rounded-md p-2">
             <div className="space-y-1">
-              <div className="text-xs font-medium text-muted-foreground mb-2 uppercase">Measures</div>
+              <div className="text-xs font-medium text-muted-foreground mb-2 uppercase">Measures ({metaMetrics.length})</div>
               {metaMetrics.map((metric) => (
                 <div key={metric} className="flex items-center space-x-2 py-1">
                   <Checkbox
@@ -368,11 +329,11 @@ export function ChartConfigDropdowns({ config, onChange, visualType }: ChartConf
                     onCheckedChange={() => handleColumnToggle(metric)}
                   />
                   <label htmlFor={`col-${metric}`} className="text-sm cursor-pointer">
-                    {metric}
+                    {getColumnDisplayName(metric)}
                   </label>
                 </div>
               ))}
-              <div className="text-xs font-medium text-muted-foreground mt-4 mb-2 uppercase">Dimensions</div>
+              <div className="text-xs font-medium text-muted-foreground mt-4 mb-2 uppercase">Dimensions ({groupByDimensions.length})</div>
               {groupByDimensions.map((dim) => (
                 <div key={dim} className="flex items-center space-x-2 py-1">
                   <Checkbox
@@ -381,7 +342,7 @@ export function ChartConfigDropdowns({ config, onChange, visualType }: ChartConf
                     onCheckedChange={() => handleColumnToggle(dim)}
                   />
                   <label htmlFor={`col-${dim}`} className="text-sm cursor-pointer">
-                    {dim}
+                    {getColumnDisplayName(dim)}
                   </label>
                 </div>
               ))}
@@ -422,7 +383,7 @@ export function ChartConfigDropdowns({ config, onChange, visualType }: ChartConf
             <SelectContent className="max-h-[300px]">
               {metaMetrics.map((metric) => (
                 <SelectItem key={metric} value={metric}>
-                  {metric}
+                  {getColumnDisplayName(metric)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -440,7 +401,7 @@ export function ChartConfigDropdowns({ config, onChange, visualType }: ChartConf
             <SelectContent className="max-h-[300px]">
               {metaMetrics.map((metric) => (
                 <SelectItem key={metric} value={metric}>
-                  {metric}
+                  {getColumnDisplayName(metric)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -458,7 +419,7 @@ export function ChartConfigDropdowns({ config, onChange, visualType }: ChartConf
             <SelectContent className="max-h-[300px]">
               {groupByDimensions.map((dimension) => (
                 <SelectItem key={dimension} value={dimension}>
-                  {dimension}
+                  {getColumnDisplayName(dimension)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -504,9 +465,9 @@ export function ChartConfigDropdowns({ config, onChange, visualType }: ChartConf
         {config.measure && config.measure2 && config.groupBy && (
           <div className="pt-3 border-t">
             <p className="text-sm text-muted-foreground">
-              Comparing <span className="font-medium text-foreground">{config.measure}</span> vs{" "}
-              <span className="font-medium text-foreground">{config.measure2}</span> by{" "}
-              <span className="font-medium text-foreground">{config.groupBy}</span>
+              Comparing <span className="font-medium text-foreground">{getColumnDisplayName(config.measure)}</span> vs{" "}
+              <span className="font-medium text-foreground">{getColumnDisplayName(config.measure2)}</span> by{" "}
+              <span className="font-medium text-foreground">{getColumnDisplayName(config.groupBy)}</span>
             </p>
           </div>
         )}
@@ -536,7 +497,7 @@ export function ChartConfigDropdowns({ config, onChange, visualType }: ChartConf
             <SelectContent className="max-h-[300px]">
               {metaMetrics.map((metric) => (
                 <SelectItem key={metric} value={metric}>
-                  {metric}
+                  {getColumnDisplayName(metric)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -554,7 +515,7 @@ export function ChartConfigDropdowns({ config, onChange, visualType }: ChartConf
             <SelectContent className="max-h-[300px]">
               {groupByDimensions.map((dimension) => (
                 <SelectItem key={dimension} value={dimension}>
-                  {dimension}
+                  {getColumnDisplayName(dimension)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -564,8 +525,8 @@ export function ChartConfigDropdowns({ config, onChange, visualType }: ChartConf
         {config.measure && config.groupBy && (
           <div className="pt-3 border-t">
             <p className="text-sm text-muted-foreground">
-              Showing <span className="font-medium text-foreground">{config.measure}</span> by{" "}
-              <span className="font-medium text-foreground">{config.groupBy}</span>
+              Showing <span className="font-medium text-foreground">{getColumnDisplayName(config.measure)}</span> by{" "}
+              <span className="font-medium text-foreground">{getColumnDisplayName(config.groupBy)}</span>
             </p>
           </div>
         )}
@@ -594,7 +555,7 @@ export function ChartConfigDropdowns({ config, onChange, visualType }: ChartConf
           <SelectContent className="max-h-[300px]">
             {metaMetrics.map((metric) => (
               <SelectItem key={metric} value={metric}>
-                {metric}
+                {getColumnDisplayName(metric)}
               </SelectItem>
             ))}
           </SelectContent>
@@ -612,7 +573,7 @@ export function ChartConfigDropdowns({ config, onChange, visualType }: ChartConf
           <SelectContent className="max-h-[300px]">
             {groupByDimensions.map((dimension) => (
               <SelectItem key={dimension} value={dimension}>
-                {dimension}
+                {getColumnDisplayName(dimension)}
               </SelectItem>
             ))}
           </SelectContent>
@@ -658,8 +619,8 @@ export function ChartConfigDropdowns({ config, onChange, visualType }: ChartConf
       {config.measure && config.groupBy && (
         <div className="pt-3 border-t">
           <p className="text-sm text-muted-foreground">
-            Showing <span className="font-medium text-foreground">{config.measure}</span> by{" "}
-            <span className="font-medium text-foreground">{config.groupBy}</span>
+            Showing <span className="font-medium text-foreground">{getColumnDisplayName(config.measure)}</span> by{" "}
+            <span className="font-medium text-foreground">{getColumnDisplayName(config.groupBy)}</span>
             {config.dateGranularity !== "none" && (
               <> split by <span className="font-medium text-foreground">{config.dateGranularity}</span></>
             )}
@@ -669,3 +630,6 @@ export function ChartConfigDropdowns({ config, onChange, visualType }: ChartConf
     </div>
   );
 }
+
+// Re-export for backward compatibility
+export { getColumnDisplayName };
