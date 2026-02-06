@@ -46,52 +46,214 @@ export type Database = {
       }
       meta_ads_campaigns: {
         Row: {
+          account_id: string | null
+          account_name: string | null
+          ad_category: string | null
+          ad_format: string | null
+          ad_id: string | null
+          ad_name: string | null
+          ad_set_label: string | null
           ad_set_name: string
+          ad_set_type: string | null
+          ad_status: string | null
+          ad_type: string | null
+          adset_id: string | null
+          adset_status: string | null
+          age: string | null
+          brand_suitability_blocked: number | null
+          brand_suitability_failed: number | null
+          campaign_category: string | null
           campaign_id: string
+          campaign_label: string | null
           campaign_name: string
+          campaign_status: string | null
+          campaign_type: string | null
           clicks: number
           conversions: number
           cpc: number
+          cpcv: number | null
+          cpe: number | null
+          cpl: number | null
           cpm: number
+          cpv: number | null
           created_at: string
           ctr: number
           date: string
+          device: string | null
+          end_date: string | null
+          engagement_rate: number | null
+          engagements: number | null
+          frequency: number | null
+          gender: string | null
           id: string
           impressions: number
+          impressions_verification: number | null
+          landing_page_view: number | null
+          leads: number | null
+          measurable_impressions: number | null
+          measurable_rate: number | null
+          objective: string | null
+          platform: string | null
+          purchases: number | null
+          reach: number | null
+          results: number | null
           roas: number
           spend: number
+          start_date: string | null
+          thruplays: number | null
+          tracked_ads: number | null
+          video_plays_100: number | null
+          video_spend: number | null
+          video_starts: number | null
+          video_view_100: number | null
+          video_view_25: number | null
+          video_view_50: number | null
+          video_view_75: number | null
+          video_views: number | null
+          viewability_impressions: number | null
+          viewability_rate: number | null
+          viewability_rate_verification: number | null
+          vtr: number | null
         }
         Insert: {
+          account_id?: string | null
+          account_name?: string | null
+          ad_category?: string | null
+          ad_format?: string | null
+          ad_id?: string | null
+          ad_name?: string | null
+          ad_set_label?: string | null
           ad_set_name: string
+          ad_set_type?: string | null
+          ad_status?: string | null
+          ad_type?: string | null
+          adset_id?: string | null
+          adset_status?: string | null
+          age?: string | null
+          brand_suitability_blocked?: number | null
+          brand_suitability_failed?: number | null
+          campaign_category?: string | null
           campaign_id: string
+          campaign_label?: string | null
           campaign_name: string
+          campaign_status?: string | null
+          campaign_type?: string | null
           clicks?: number
           conversions?: number
           cpc?: number
+          cpcv?: number | null
+          cpe?: number | null
+          cpl?: number | null
           cpm?: number
+          cpv?: number | null
           created_at?: string
           ctr?: number
           date?: string
+          device?: string | null
+          end_date?: string | null
+          engagement_rate?: number | null
+          engagements?: number | null
+          frequency?: number | null
+          gender?: string | null
           id?: string
           impressions?: number
+          impressions_verification?: number | null
+          landing_page_view?: number | null
+          leads?: number | null
+          measurable_impressions?: number | null
+          measurable_rate?: number | null
+          objective?: string | null
+          platform?: string | null
+          purchases?: number | null
+          reach?: number | null
+          results?: number | null
           roas?: number
           spend?: number
+          start_date?: string | null
+          thruplays?: number | null
+          tracked_ads?: number | null
+          video_plays_100?: number | null
+          video_spend?: number | null
+          video_starts?: number | null
+          video_view_100?: number | null
+          video_view_25?: number | null
+          video_view_50?: number | null
+          video_view_75?: number | null
+          video_views?: number | null
+          viewability_impressions?: number | null
+          viewability_rate?: number | null
+          viewability_rate_verification?: number | null
+          vtr?: number | null
         }
         Update: {
+          account_id?: string | null
+          account_name?: string | null
+          ad_category?: string | null
+          ad_format?: string | null
+          ad_id?: string | null
+          ad_name?: string | null
+          ad_set_label?: string | null
           ad_set_name?: string
+          ad_set_type?: string | null
+          ad_status?: string | null
+          ad_type?: string | null
+          adset_id?: string | null
+          adset_status?: string | null
+          age?: string | null
+          brand_suitability_blocked?: number | null
+          brand_suitability_failed?: number | null
+          campaign_category?: string | null
           campaign_id?: string
+          campaign_label?: string | null
           campaign_name?: string
+          campaign_status?: string | null
+          campaign_type?: string | null
           clicks?: number
           conversions?: number
           cpc?: number
+          cpcv?: number | null
+          cpe?: number | null
+          cpl?: number | null
           cpm?: number
+          cpv?: number | null
           created_at?: string
           ctr?: number
           date?: string
+          device?: string | null
+          end_date?: string | null
+          engagement_rate?: number | null
+          engagements?: number | null
+          frequency?: number | null
+          gender?: string | null
           id?: string
           impressions?: number
+          impressions_verification?: number | null
+          landing_page_view?: number | null
+          leads?: number | null
+          measurable_impressions?: number | null
+          measurable_rate?: number | null
+          objective?: string | null
+          platform?: string | null
+          purchases?: number | null
+          reach?: number | null
+          results?: number | null
           roas?: number
           spend?: number
+          start_date?: string | null
+          thruplays?: number | null
+          tracked_ads?: number | null
+          video_plays_100?: number | null
+          video_spend?: number | null
+          video_starts?: number | null
+          video_view_100?: number | null
+          video_view_25?: number | null
+          video_view_50?: number | null
+          video_view_75?: number | null
+          video_views?: number | null
+          viewability_impressions?: number | null
+          viewability_rate?: number | null
+          viewability_rate_verification?: number | null
+          vtr?: number | null
         }
         Relationships: []
       }
