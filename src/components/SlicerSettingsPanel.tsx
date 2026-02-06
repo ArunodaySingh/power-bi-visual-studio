@@ -12,8 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
-import { Filter } from "lucide-react";
-import { metaMetrics, groupByDimensions } from "@/components/ChartConfigDropdowns";
+import { Filter, Loader2 } from "lucide-react";
+import { useMetaAdsSchema, getColumnDisplayName } from "@/hooks/useMetaAdsSchema";
 import type { SlicerData } from "@/types/dashboard";
 
 interface SlicerSettingsPanelProps {
@@ -22,9 +22,15 @@ interface SlicerSettingsPanelProps {
 }
 
 export function SlicerSettingsPanel({ slicer, onUpdate }: SlicerSettingsPanelProps) {
+  const { data: schema, isLoading } = useMetaAdsSchema();
+  
   const isDropdownOrList = slicer.type === "dropdown" || slicer.type === "list";
   const isDateRange = slicer.type === "date-range";
   const isNumericRange = slicer.type === "numeric-range";
+  
+  // Dynamic measures and dimensions from database
+  const metaMetrics = schema?.measures || [];
+  const groupByDimensions = schema?.dimensions || [];
 
   const handleFieldChange = (value: string) => {
     onUpdate({ 
@@ -45,6 +51,16 @@ export function SlicerSettingsPanel({ slicer, onUpdate }: SlicerSettingsPanelPro
       selectedValues: checked ? slicer.selectedValues : slicer.selectedValues.slice(0, 1),
     });
   };
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        <span className="ml-2 text-sm text-muted-foreground">Loading schema...</span>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4 overflow-hidden">
@@ -89,9 +105,9 @@ export function SlicerSettingsPanel({ slicer, onUpdate }: SlicerSettingsPanelPro
                 <SelectValue placeholder="Select a dimension..." />
               </SelectTrigger>
               <SelectContent className="max-h-[300px]">
-                {groupByDimensions.map((dimension) => (
+              {groupByDimensions.map((dimension) => (
                   <SelectItem key={dimension} value={dimension}>
-                    {dimension}
+                    {getColumnDisplayName(dimension)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -137,7 +153,7 @@ export function SlicerSettingsPanel({ slicer, onUpdate }: SlicerSettingsPanelPro
             <SelectContent className="max-h-[300px]">
               {metaMetrics.map((metric) => (
                 <SelectItem key={metric} value={metric}>
-                  {metric}
+                  {getColumnDisplayName(metric)}
                 </SelectItem>
               ))}
             </SelectContent>
