@@ -83,6 +83,8 @@ function ViewDashboardContent() {
 
   const [slicerDateRanges, setSlicerDateRanges] = useState<Map<string, { start: Date | null; end: Date | null }>>(new Map());
   const [slicerNumericRanges, setSlicerNumericRanges] = useState<Map<string, { min: number; max: number }>>(new Map());
+  // Local slicer state so selections are reflected in the UI
+  const [slicerSelections, setSlicerSelections] = useState<Map<string, (string | number)[]>>(new Map());
 
   const { data: dashboard, isLoading, error } = useQuery({
     queryKey: ["dashboard", id],
@@ -193,6 +195,9 @@ function ViewDashboardContent() {
   // Handle slicer updates (only filters, no structural changes)
   const handleUpdateSlicer = useCallback((id: string, updates: Partial<SlicerData>) => {
     if (updates.selectedValues !== undefined) {
+      // Update local UI state
+      setSlicerSelections((prev) => new Map(prev).set(id, updates.selectedValues!));
+      
       const slicer = activeSheet?.slicers.find((s) => s.id === id);
       if (slicer) {
         if (updates.selectedValues.length > 0) {
@@ -334,8 +339,13 @@ function ViewDashboardContent() {
           
           {/* Render Slicers */}
           {activeSheet?.slicers.map((slicer) => {
+            // Use local selection state, falling back to saved state
+            const localSlicer = {
+              ...slicer,
+              selectedValues: slicerSelections.get(slicer.id) ?? slicer.selectedValues,
+            };
             const slicerProps = {
-              slicer,
+              slicer: localSlicer,
               isSelected: false,
               onSelect: () => {},
               onUpdate: (updates: Partial<SlicerData>) => handleUpdateSlicer(slicer.id, updates),
