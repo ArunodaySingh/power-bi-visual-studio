@@ -35,7 +35,8 @@ export function DropdownSlicer({
 
   const handleToggleValue = (value: string | number) => {
     const currentValues = slicer.selectedValues;
-    const newValues = slicer.multiSelect
+    const isMulti = slicer.multiSelect !== false;
+    const newValues = isMulti
       ? currentValues.includes(value)
         ? currentValues.filter((v) => v !== value)
         : [...currentValues, value]
