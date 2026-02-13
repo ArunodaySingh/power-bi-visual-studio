@@ -597,9 +597,12 @@ function DashboardContent() {
     setIsSaving(true);
     try {
       // Convert slotVisuals Map to plain object for JSON storage
+      // Also persist visualConfigs so view mode can recompute data dynamically
+      const configsObj = Object.fromEntries(visualConfigs);
       const sheetsForStorage = sheets.map((sheet) => ({
         ...sheet,
         slotVisuals: Object.fromEntries(sheet.slotVisuals),
+        visualConfigs: configsObj,
       }));
 
       // Insert dashboard into Supabase
