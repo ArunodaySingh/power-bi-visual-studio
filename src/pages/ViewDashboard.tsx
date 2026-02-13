@@ -13,10 +13,14 @@ import { useMetaAdsData, getUniqueValues } from "@/hooks/useMetaAdsData";
 import { DropdownSlicer, ListSlicer, DateRangeSlicer, NumericRangeSlicer } from "@/components/slicers";
 import { TextContainer, type TextContainerData } from "@/components/TextContainer";
 import { getGridStyle } from "@/utils/layoutStyles";
+import { aggregateVisualData } from "@/utils/aggregateVisualData";
+import { getColumnDisplayName } from "@/hooks/useMetaAdsSchema";
+import type { ChartConfig } from "@/components/ChartConfigDropdowns";
 import type { SlicerData } from "@/types/dashboard";
 import type { DataPoint } from "@/components/DataEditor";
 import type { VisualProperties } from "@/components/PropertyPanel";
 import type { VisualType } from "@/components/VisualTypeSelector";
+
 interface SlotData {
   id: string;
   position: { row: number; col: number };
@@ -54,6 +58,7 @@ interface SheetData {
   slotVisuals: Record<string, VisualData>;
   slicers: SlicerData[];
   textContainers?: TextContainerData[];
+  visualConfigs?: Record<string, ChartConfig>;
 }
 
 interface Dashboard {
@@ -67,7 +72,7 @@ function ViewDashboardContent() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
-  const { filters, addFilter, removeFilter } = useFilters();
+  const { filters, addFilter, removeFilter, getFilteredData } = useFilters();
   const { crossFilter, setCrossFilter } = useCrossFilter();
   const { data: metaAdsData = [], isLoading: isLoadingMetaAds, error: metaAdsError, refetch: refetchMetaAds, isFetching: isFetchingMetaAds } = useMetaAdsData();
 
@@ -90,7 +95,6 @@ function ViewDashboardContent() {
       
       if (error) throw error;
       
-      // Parse sheets_data from JSON
       const sheetsData = data.sheets_data as unknown as SheetData[];
       return {
         ...data,
@@ -103,14 +107,70 @@ function ViewDashboardContent() {
   const sheets = useMemo(() => dashboard?.sheets_data || [], [dashboard]);
   const [activeSheetId, setActiveSheetId] = useState<string>("");
 
-  // Set initial active sheet when dashboard loads
   const activeSheet = useMemo(() => {
     if (sheets.length === 0) return null;
     const sheetId = activeSheetId || sheets[0]?.id;
     return sheets.find((s) => s.id === sheetId) || sheets[0];
   }, [sheets, activeSheetId]);
 
-  // Get slicer values from database
+  // Apply filters to meta ads data
+  const filteredMetaAdsData = useMemo(() => {
+    if (metaAdsData.length === 0) return [];
+    // Map filter fields from slicer field names to actual DB column names
+    const fieldKeyMap: Record<string, string> = {
+      campaignName: "campaign_name",
+      adSetName: "ad_set_name",
+    };
+    // Transform data to use slicer field names for filtering
+    const mappedData = metaAdsData.map(record => {
+      const mapped: Record<string, unknown> = { ...record };
+      // Add aliased keys so filters work
+      mapped.campaignName = record.campaign_name;
+      mapped.adSetName = record.ad_set_name;
+      return mapped;
+    });
+    const filtered = getFilteredData(mappedData);
+    // Map back to MetaAdsCampaign
+    return filtered.map(r => {
+      const copy = { ...r } as Record<string, unknown>;
+      delete copy.campaignName;
+      delete copy.adSetName;
+      return copy as unknown as typeof metaAdsData[0];
+    });
+  }, [metaAdsData, getFilteredData, filters]);
+
+  // Dynamically compute visual data using saved configs + filtered data
+  const computedVisualData = useMemo(() => {
+    const configs = activeSheet?.visualConfigs || {};
+    const result = new Map<string, DataPoint[]>();
+    
+    // Compute for standalone visuals
+    activeSheet?.visuals.forEach((visual) => {
+      const config = configs[visual.id];
+      if (config && filteredMetaAdsData.length > 0) {
+        result.set(visual.id, aggregateVisualData(filteredMetaAdsData, config, visual.type));
+      } else {
+        // Fallback to saved static data
+        result.set(visual.id, visual.data);
+      }
+    });
+
+    // Compute for slot visuals
+    if (activeSheet?.slotVisuals) {
+      Object.entries(activeSheet.slotVisuals).forEach(([slotId, visual]) => {
+        const config = configs[visual.id];
+        if (config && filteredMetaAdsData.length > 0) {
+          result.set(visual.id, aggregateVisualData(filteredMetaAdsData, config, visual.type));
+        } else {
+          result.set(visual.id, visual.data);
+        }
+      });
+    }
+
+    return result;
+  }, [activeSheet, filteredMetaAdsData]);
+
+  // Get slicer values from database (unfiltered for full range)
   const getSlicerValues = useCallback((field: string): (string | number)[] => {
     if (metaAdsData.length === 0) return [];
     const fieldKeyMap: Record<string, keyof typeof metaAdsData[0]> = {
@@ -338,27 +398,30 @@ function ViewDashboardContent() {
           })}
 
           {/* Render Standalone Visuals */}
-          {activeSheet?.visuals.map((visual) => (
-            <div
-              key={visual.id}
-              className="absolute bg-card rounded-lg border shadow-sm overflow-hidden"
-              style={{
-                left: visual.position.x,
-                top: visual.position.y,
-                width: visual.size.width,
-                height: visual.size.height,
-              }}
-            >
-              <VisualPreview
-                type={visual.type}
-                data={visual.data}
-                properties={visual.properties}
-                highlightedValue={crossFilter?.value || null}
-                onDataClick={(dimension, value) => handleVisualDataClick(visual.id, dimension, value)}
-                valueFieldNames={visual.fieldMapping?.values?.map(v => v.name)}
-              />
-            </div>
-          ))}
+          {activeSheet?.visuals.map((visual) => {
+            const dynamicData = computedVisualData.get(visual.id) || visual.data;
+            return (
+              <div
+                key={visual.id}
+                className="absolute bg-card rounded-lg border shadow-sm overflow-hidden"
+                style={{
+                  left: visual.position.x,
+                  top: visual.position.y,
+                  width: visual.size.width,
+                  height: visual.size.height,
+                }}
+              >
+                <VisualPreview
+                  type={visual.type}
+                  data={dynamicData}
+                  properties={visual.properties}
+                  highlightedValue={crossFilter?.value || null}
+                  onDataClick={(dimension, value) => handleVisualDataClick(visual.id, dimension, value)}
+                  valueFieldNames={visual.fieldMapping?.values?.map(v => v.name)}
+                />
+              </div>
+            );
+          })}
 
           {/* Render Panel Slot Visuals */}
           {activeSheet?.panels.map((panel) => (
@@ -383,6 +446,7 @@ function ViewDashboardContent() {
                       />
                     );
                   }
+                  const dynamicData = computedVisualData.get(visual.id) || visual.data;
                   return (
                     <div 
                       key={slot.id} 
@@ -391,7 +455,7 @@ function ViewDashboardContent() {
                       <div className="w-full h-full p-3">
                         <VisualPreview
                           type={visual.type}
-                          data={visual.data}
+                          data={dynamicData}
                           properties={visual.properties}
                           highlightedValue={crossFilter?.value || null}
                           onDataClick={(dimension, value) => handleVisualDataClick(visual.id, dimension, value)}
