@@ -154,6 +154,15 @@ export function FilterProvider({ children }: FilterProviderProps) {
                   num <= filter.numericRange.max
                 );
               }
+              if (filter.dateRange) {
+                const dateStr = String(value);
+                if (!dateStr) return true;
+                const itemDate = new Date(dateStr);
+                if (isNaN(itemDate.getTime())) return true;
+                if (filter.dateRange.start && itemDate < filter.dateRange.start) return false;
+                if (filter.dateRange.end && itemDate > filter.dateRange.end) return false;
+                return true;
+              }
               return true;
             default:
               if (filter.values.length === 0) return true;

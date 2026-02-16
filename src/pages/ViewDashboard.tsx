@@ -350,6 +350,17 @@ function ViewDashboardContent() {
                   dateRange={slicerDateRanges.get(slicer.id) || { start: null, end: null }}
                   onDateRangeChange={(range) => {
                     setSlicerDateRanges((prev) => new Map(prev).set(slicer.id, range));
+                    // Apply date filter dynamically
+                    if (range.start || range.end) {
+                      addFilter({
+                        field: slicer.field,
+                        values: [],
+                        operator: "between",
+                        dateRange: range,
+                      });
+                    } else {
+                      removeFilter(slicer.field);
+                    }
                   }}
                 />
               );
