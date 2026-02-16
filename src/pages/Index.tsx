@@ -1,5 +1,5 @@
 /**
- * Index.tsx - Main Dashboard Builder Page
+ * Index.tsx - Main Dashboard Builder Page (v2)
  *
  * This is the core dashboard creation interface where users can:
  * - Drag and drop panel layouts onto the canvas
