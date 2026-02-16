@@ -294,11 +294,11 @@ const getDefaultSlicerField = (
     case 'date-range':
       return { field: 'date', label: 'Date' };
     case 'numeric-range':
-      return { field: 'Spend', label: 'Spend' };
+      return { field: 'spend', label: 'Spend' };
     case 'dropdown':
     case 'list':
     default:
-      return { field: 'Campaign Name', label: 'Campaign Name' };
+      return { field: 'campaign_name', label: 'Campaign Name' };
   }
 };
 
@@ -2017,16 +2017,7 @@ function DashboardContent() {
                     </>
                   )}
                 </Button>
-                <Button
-                  variant='outline'
-                  size='sm'
-                  onClick={handleUndo}
-                  disabled={undoHistory.length === 0}
-                  title='Undo (Ctrl+Z)'
-                >
-                  <Undo2 className='h-4 w-4 mr-1' />
-                  Undo
-                </Button>
+                
                 <Button
                   variant='outline'
                   size='sm'

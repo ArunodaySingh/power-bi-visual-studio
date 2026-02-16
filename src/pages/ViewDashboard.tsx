@@ -116,29 +116,13 @@ function ViewDashboardContent() {
   }, [sheets, activeSheetId]);
 
   // Apply filters to meta ads data
+  // Slicer fields are stored as DB column names (e.g. "campaign_name", "spend")
+  // which match the MetaAdsCampaign keys directly — no aliasing needed.
   const filteredMetaAdsData = useMemo(() => {
     if (metaAdsData.length === 0) return [];
-    // Map filter fields from slicer field names to actual DB column names
-    const fieldKeyMap: Record<string, string> = {
-      campaignName: "campaign_name",
-      adSetName: "ad_set_name",
-    };
-    // Transform data to use slicer field names for filtering
-    const mappedData = metaAdsData.map(record => {
-      const mapped: Record<string, unknown> = { ...record };
-      // Add aliased keys so filters work
-      mapped.campaignName = record.campaign_name;
-      mapped.adSetName = record.ad_set_name;
-      return mapped;
-    });
-    const filtered = getFilteredData(mappedData);
-    // Map back to MetaAdsCampaign
-    return filtered.map(r => {
-      const copy = { ...r } as Record<string, unknown>;
-      delete copy.campaignName;
-      delete copy.adSetName;
-      return copy as unknown as typeof metaAdsData[0];
-    });
+    const asRecords = metaAdsData as unknown as Record<string, unknown>[];
+    const filtered = getFilteredData(asRecords);
+    return filtered as unknown as typeof metaAdsData;
   }, [metaAdsData, getFilteredData, filters]);
 
   // Dynamically compute visual data using saved configs + filtered data
@@ -173,22 +157,10 @@ function ViewDashboardContent() {
   }, [activeSheet, filteredMetaAdsData]);
 
   // Get slicer values from database (unfiltered for full range)
+  // Field names are DB column names directly (e.g. "campaign_name", "spend")
   const getSlicerValues = useCallback((field: string): (string | number)[] => {
     if (metaAdsData.length === 0) return [];
-    const fieldKeyMap: Record<string, keyof typeof metaAdsData[0]> = {
-      campaignName: "campaign_name",
-      adSetName: "ad_set_name",
-      date: "date",
-      impressions: "impressions",
-      clicks: "clicks",
-      spend: "spend",
-      conversions: "conversions",
-      ctr: "ctr",
-      cpc: "cpc",
-      cpm: "cpm",
-      roas: "roas",
-    };
-    const dbField = fieldKeyMap[field] || field as keyof typeof metaAdsData[0];
+    const dbField = field as keyof typeof metaAdsData[0];
     return getUniqueValues(metaAdsData, dbField);
   }, [metaAdsData]);
 
