@@ -10,6 +10,7 @@ import { FilterProvider, useFilters } from "@/contexts/FilterContext";
 import { CrossFilterProvider, useCrossFilter } from "@/contexts/CrossFilterContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { useMetaAdsData, getUniqueValues } from "@/hooks/useMetaAdsData";
+import { useMetaAdsSchema } from "@/hooks/useMetaAdsSchema";
 import { DropdownSlicer, ListSlicer, DateRangeSlicer, NumericRangeSlicer } from "@/components/slicers";
 import { TextContainer, type TextContainerData } from "@/components/TextContainer";
 import { getGridStyle } from "@/utils/layoutStyles";
@@ -75,6 +76,7 @@ function ViewDashboardContent() {
   const { filters, addFilter, removeFilter, getFilteredData } = useFilters();
   const { crossFilter, setCrossFilter } = useCrossFilter();
   const { data: metaAdsData = [], isLoading: isLoadingMetaAds, error: metaAdsError, refetch: refetchMetaAds, isFetching: isFetchingMetaAds } = useMetaAdsData();
+  const { data: schemaData } = useMetaAdsSchema();
 
   const handleSignOut = async () => {
     await signOut();
@@ -125,44 +127,73 @@ function ViewDashboardContent() {
     return filtered as unknown as typeof metaAdsData;
   }, [metaAdsData, getFilteredData, filters]);
 
+  // Build a default ChartConfig for a visual type when none is saved
+  const buildDefaultConfig = useCallback((visualType: VisualType): ChartConfig | null => {
+    if (!schemaData) return null;
+    const defaultMeasure = schemaData.measures[0] || "clicks";
+    const defaultDimension = schemaData.dimensions.find(d => d === "campaign_name") || schemaData.dimensions[0] || "campaign_name";
+
+    switch (visualType) {
+      case "card":
+        return { measure: defaultMeasure, groupBy: "", dateGranularity: "none", calculation: "sum" };
+      case "table":
+        return { measure: "", groupBy: "", dateGranularity: "none", selectedColumns: [defaultDimension, defaultMeasure] };
+      case "matrix":
+        return { measure: defaultMeasure, groupBy: "", dateGranularity: "none", matrixRows: [defaultDimension], matrixColumns: [] };
+      case "pie":
+        return { measure: defaultMeasure, groupBy: defaultDimension, dateGranularity: "none" };
+      case "multiline":
+        return { measure: defaultMeasure, measure2: schemaData.measures[1] || defaultMeasure, groupBy: defaultDimension, dateGranularity: "none" };
+      default:
+        return { measure: defaultMeasure, groupBy: defaultDimension, dateGranularity: "none" };
+    }
+  }, [schemaData]);
+
   // Dynamically compute visual data using saved configs + filtered data
+  // If no config is saved, auto-generate a default so filtering always works
   const computedVisualData = useMemo(() => {
-    const configs = activeSheet?.visualConfigs || {};
+    const savedConfigs = activeSheet?.visualConfigs || {};
     const result = new Map<string, DataPoint[]>();
-    
-    // Compute for standalone visuals
-    activeSheet?.visuals.forEach((visual) => {
-      const config = configs[visual.id];
+
+    const computeForVisual = (visual: VisualData) => {
+      const config = savedConfigs[visual.id] || buildDefaultConfig(visual.type);
       if (config && filteredMetaAdsData.length > 0) {
         result.set(visual.id, aggregateVisualData(filteredMetaAdsData, config, visual.type));
       } else {
-        // Fallback to saved static data
         result.set(visual.id, visual.data);
       }
-    });
+    };
+
+    // Compute for standalone visuals
+    activeSheet?.visuals.forEach(computeForVisual);
 
     // Compute for slot visuals
     if (activeSheet?.slotVisuals) {
-      Object.entries(activeSheet.slotVisuals).forEach(([slotId, visual]) => {
-        const config = configs[visual.id];
-        if (config && filteredMetaAdsData.length > 0) {
-          result.set(visual.id, aggregateVisualData(filteredMetaAdsData, config, visual.type));
-        } else {
-          result.set(visual.id, visual.data);
-        }
-      });
+      Object.values(activeSheet.slotVisuals).forEach(computeForVisual);
     }
 
     return result;
-  }, [activeSheet, filteredMetaAdsData]);
+  }, [activeSheet, filteredMetaAdsData, buildDefaultConfig]);
+
+  // Normalize slicer field to DB column name (handles legacy uppercase like "Spend" → "spend")
+  const normalizeField = useCallback((field: string): string => {
+    // If field exists as-is on MetaAdsCampaign, use it directly
+    if (metaAdsData.length > 0 && field in metaAdsData[0]) return field;
+    // Try lowercase version
+    const lower = field.toLowerCase();
+    if (metaAdsData.length > 0 && lower in metaAdsData[0]) return lower;
+    // Try snake_case conversion (e.g. "Campaign Name" → "campaign_name")
+    const snaked = field.toLowerCase().replace(/\s+/g, '_');
+    if (metaAdsData.length > 0 && snaked in metaAdsData[0]) return snaked;
+    return field;
+  }, [metaAdsData]);
 
   // Get slicer values from database (unfiltered for full range)
-  // Field names are DB column names directly (e.g. "campaign_name", "spend")
   const getSlicerValues = useCallback((field: string): (string | number)[] => {
     if (metaAdsData.length === 0) return [];
-    const dbField = field as keyof typeof metaAdsData[0];
+    const dbField = normalizeField(field) as keyof typeof metaAdsData[0];
     return getUniqueValues(metaAdsData, dbField);
-  }, [metaAdsData]);
+  }, [metaAdsData, normalizeField]);
 
   // Handle slicer updates (only filters, no structural changes)
   const handleUpdateSlicer = useCallback((id: string, updates: Partial<SlicerData>) => {
@@ -172,18 +203,19 @@ function ViewDashboardContent() {
       
       const slicer = activeSheet?.slicers.find((s) => s.id === id);
       if (slicer) {
+        const field = normalizeField(slicer.field);
         if (updates.selectedValues.length > 0) {
           addFilter({
-            field: slicer.field,
+            field,
             values: updates.selectedValues,
             operator: "equals",
           });
         } else {
-          removeFilter(slicer.field);
+          removeFilter(field);
         }
       }
     }
-  }, [activeSheet, addFilter, removeFilter]);
+  }, [activeSheet, addFilter, removeFilter, normalizeField]);
 
   // Handle cross-filter click from visual
   const handleVisualDataClick = useCallback((visualId: string, dimension: string, value: string) => {
@@ -353,13 +385,13 @@ function ViewDashboardContent() {
                     // Apply date filter dynamically
                     if (range.start || range.end) {
                       addFilter({
-                        field: slicer.field,
+                        field: normalizeField(slicer.field),
                         values: [],
                         operator: "between",
                         dateRange: range,
                       });
                     } else {
-                      removeFilter(slicer.field);
+                      removeFilter(normalizeField(slicer.field));
                     }
                   }}
                 />
@@ -378,7 +410,7 @@ function ViewDashboardContent() {
                   onRangeChange={(range) => {
                     setSlicerNumericRanges((prev) => new Map(prev).set(slicer.id, range));
                     addFilter({
-                      field: slicer.field,
+                      field: normalizeField(slicer.field),
                       values: [],
                       operator: "between",
                       numericRange: range,
