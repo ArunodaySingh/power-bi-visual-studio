@@ -6,12 +6,12 @@
  * - Add chart visuals to panel slots
  * - Configure chart data using Measure/GroupBy/Date dropdowns
  * - Add filter slicers for data filtering
- * - Save dashboards to the database
+ * - Export dashboards as JSON
  *
  * Architecture:
  * - Uses DndContext from @dnd-kit for drag-and-drop functionality
  * - Manages state for sheets, panels, visuals, and slicers
- * - Integrates with Supabase for data fetching and persistence
+ * - Integrates with BigQuery for data fetching
  */
 
 import { useState, useCallback, useEffect, useRef } from 'react';
@@ -315,8 +315,8 @@ const getDefaultSlicerField = (
  * - Multiple sheets with panels, visuals, and slicers
  * - Drag and drop for adding elements
  * - Chart configuration via dropdowns
- * - Data fetching from Supabase
- * - Dashboard saving functionality
+ * - Data fetching from BigQuery
+ * - Dashboard export functionality
  */
 function DashboardContent() {
   // ========== HOOKS & CONTEXTS ==========
@@ -729,7 +729,7 @@ function DashboardContent() {
 
   // ========== SAVE DASHBOARD HANDLER ==========
   /**
-   * Saves the current dashboard to Supabase
+   * Exports the current dashboard as JSON
    * Converts Map structures to plain objects for JSON serialization
    */
   const handleSaveDashboard = useCallback(async () => {
