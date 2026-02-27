@@ -16,7 +16,7 @@ import { Label } from "@/components/ui/label";
 import { BarChart3, Loader2 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useMetaAdsSchema, getColumnDisplayName } from "@/hooks/useMetaAdsSchema";
+import { getColumnDisplayName } from "@/hooks/useBigQueryData";
 
 // ============================================================================
 // CONSTANTS - Date and Calculation Types (static)
@@ -76,14 +76,16 @@ interface ChartConfigDropdownsProps {
   config: ChartConfig;
   onChange: (config: ChartConfig) => void;
   visualType?: string;
+  schema?: { measures: string[]; dimensions: string[]; allColumns: string[] } | null;
+  isSchemaLoading?: boolean;
 }
 
 // ============================================================================
 // MAIN COMPONENT
 // ============================================================================
 
-export function ChartConfigDropdowns({ config, onChange, visualType }: ChartConfigDropdownsProps) {
-  const { data: schema, isLoading } = useMetaAdsSchema();
+export function ChartConfigDropdowns({ config, onChange, visualType, schema: externalSchema, isSchemaLoading }: ChartConfigDropdownsProps) {
+  const isLoading = isSchemaLoading ?? false;
   
   const isPieChart = visualType === "pie";
   const isMultiLineChart = visualType === "multiline";
@@ -91,10 +93,10 @@ export function ChartConfigDropdowns({ config, onChange, visualType }: ChartConf
   const isCardChart = visualType === "card";
   const isMatrixChart = visualType === "matrix";
 
-  // Dynamic measures and dimensions from database
-  const metaMetrics = schema?.measures || [];
-  const groupByDimensions = schema?.dimensions || [];
-  const allColumns = schema?.allColumns || [];
+  // Dynamic measures and dimensions from schema prop
+  const metaMetrics = externalSchema?.measures || [];
+  const groupByDimensions = externalSchema?.dimensions || [];
+  const allColumns = externalSchema?.allColumns || [];
 
   const handleMeasureChange = (value: string) => {
     onChange({ ...config, measure: value });

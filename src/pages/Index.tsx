@@ -96,11 +96,13 @@ import {
   useCrossFilter,
 } from '@/contexts/CrossFilterContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { useMetaAdsData, getUniqueValues } from '@/hooks/useMetaAdsData';
 import {
-  useMetaAdsSchema,
+  useBigQuerySchema,
+  useBigQueryTableData,
   getColumnDisplayName,
-} from '@/hooks/useMetaAdsSchema';
+  getUniqueValues,
+} from '@/hooks/useBigQueryData';
+import { BigQueryConfig, type BigQueryConnection } from '@/components/BigQueryConfig';
 
 // Slicer components
 import {
@@ -323,17 +325,34 @@ function DashboardContent() {
   const { filters, addFilter, removeFilter, getFilteredData } = useFilters(); // Global filters
   const { crossFilter, setCrossFilter, clearCrossFilter } = useCrossFilter(); // Cross-filtering between charts
 
-  // Fetch Meta Ads data from Supabase
+  // BigQuery connection state
+  const [bqConnection, setBqConnection] = useState<BigQueryConnection>({
+    projectId: '',
+    datasetId: '',
+    tableId: '',
+  });
+
+  // Fetch BigQuery data
   const {
-    data: metaAdsData = [],
+    data: bqTableData,
     isLoading: isLoadingMetaAds,
     error: metaAdsError,
     refetch: refetchMetaAds,
     isFetching: isFetchingMetaAds,
-  } = useMetaAdsData();
+  } = useBigQueryTableData(
+    bqConnection.projectId || null,
+    bqConnection.datasetId || null,
+    bqConnection.tableId || null,
+  );
+
+  const metaAdsData = bqTableData?.rows || [];
 
   // Fetch schema for default config values
-  const { data: schemaData } = useMetaAdsSchema();
+  const { data: schemaData, isLoading: isSchemaLoading } = useBigQuerySchema(
+    bqConnection.projectId || null,
+    bqConnection.datasetId || null,
+    bqConnection.tableId || null,
+  );
 
   const handleSignOut = async () => {
     await signOut();
@@ -344,9 +363,9 @@ function DashboardContent() {
 
   // Sheet state - each sheet contains panels, visuals, and slicers
   const [sheets, setSheets] = useState<SheetData[]>([
-    createEmptySheet('Meta Ads'),
-    createEmptySheet('GA'),
-    createEmptySheet('DV360'),
+    createEmptySheet('Sheet 1'),
+    createEmptySheet('Sheet 2'),
+    createEmptySheet('Sheet 3'),
   ]);
   const [activeSheetId, setActiveSheetId] = useState(sheets[0].id);
 
@@ -737,6 +756,7 @@ function DashboardContent() {
         ...sheet,
         slotVisuals: Object.fromEntries(sheet.slotVisuals),
         visualConfigs: configsObj,
+        bigQueryConnection: bqConnection,
       }));
 
       // Insert dashboard into Supabase
@@ -1189,14 +1209,9 @@ function DashboardContent() {
   // Field-drop handler removed - using dropdown configuration instead
 
   // Get available values for slicer field from database
-  // Field comes directly as database column name from the schema
   const getSlicerValues = (field: string): (string | number)[] => {
     if (metaAdsData.length === 0) return [];
-
-    // Field is now the actual database column name from the dynamic schema
-    // Just use it directly
-    const dbField = field as keyof (typeof metaAdsData)[0];
-    return getUniqueValues(metaAdsData, dbField);
+    return getUniqueValues(metaAdsData, field);
   };
 
   // Handle cross-filter click from visual
@@ -1285,8 +1300,8 @@ function DashboardContent() {
             (c) => typeof record[c as keyof typeof record] === 'number',
           );
           row.category = firstDimCol
-            ? String(record[firstDimCol as keyof typeof record])
-            : String(record.campaign_name);
+            ? String(record[firstDimCol])
+            : String(Object.values(record).find(v => typeof v === 'string') || 'Unknown');
           row.value = firstMeasureCol
             ? Number(record[firstMeasureCol as keyof typeof record])
             : 0;
@@ -1879,6 +1894,10 @@ function DashboardContent() {
             <div
               className={`w-64 h-full flex flex-col ${showLeftPanel ? '' : 'invisible'}`}
             >
+              <BigQueryConfig
+                connection={bqConnection}
+                onConnectionChange={setBqConnection}
+              />
               <ComponentPalette
                 onAddVisual={handleAddVisual}
                 onAddSlicer={handleAddSlicer}
@@ -2247,6 +2266,8 @@ function DashboardContent() {
                           handleChartConfigChange(selectedVisual.id, config)
                         }
                         visualType={selectedVisual.type}
+                        schema={schemaData}
+                        isSchemaLoading={isSchemaLoading}
                       />
                     ) : selectedPanel ? (
                       <div className='space-y-3'>
@@ -2272,6 +2293,8 @@ function DashboardContent() {
                         onUpdate={(updates) =>
                           handleUpdateSlicer(selectedSlicer.id, updates)
                         }
+                        schema={schemaData}
+                        isSchemaLoading={isSchemaLoading}
                       />
                     ) : (
                       <div className='text-sm text-muted-foreground text-center py-8'>

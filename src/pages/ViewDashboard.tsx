@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, LayoutDashboard, Loader2, Filter, Database, RefreshCw, AlertCircle, LogOut } from "lucide-react";
@@ -9,13 +9,12 @@ import { VisualPreview } from "@/components/VisualPreview";
 import { FilterProvider, useFilters } from "@/contexts/FilterContext";
 import { CrossFilterProvider, useCrossFilter } from "@/contexts/CrossFilterContext";
 import { useAuth } from "@/contexts/AuthContext";
-import { useMetaAdsData, getUniqueValues } from "@/hooks/useMetaAdsData";
-import { useMetaAdsSchema } from "@/hooks/useMetaAdsSchema";
+import { useBigQueryTableData, useBigQuerySchema, getUniqueValues, getColumnDisplayName } from "@/hooks/useBigQueryData";
+import { BigQueryConfig, type BigQueryConnection } from "@/components/BigQueryConfig";
 import { DropdownSlicer, ListSlicer, DateRangeSlicer, NumericRangeSlicer } from "@/components/slicers";
 import { TextContainer, type TextContainerData } from "@/components/TextContainer";
 import { getGridStyle } from "@/utils/layoutStyles";
 import { aggregateVisualData } from "@/utils/aggregateVisualData";
-import { getColumnDisplayName } from "@/hooks/useMetaAdsSchema";
 import type { ChartConfig } from "@/components/ChartConfigDropdowns";
 import type { SlicerData } from "@/types/dashboard";
 import type { DataPoint } from "@/components/DataEditor";
@@ -60,6 +59,7 @@ interface SheetData {
   slicers: SlicerData[];
   textContainers?: TextContainerData[];
   visualConfigs?: Record<string, ChartConfig>;
+  bigQueryConnection?: BigQueryConnection;
 }
 
 interface Dashboard {
@@ -75,8 +75,25 @@ function ViewDashboardContent() {
   const { user, signOut } = useAuth();
   const { filters, addFilter, removeFilter, getFilteredData } = useFilters();
   const { crossFilter, setCrossFilter } = useCrossFilter();
-  const { data: metaAdsData = [], isLoading: isLoadingMetaAds, error: metaAdsError, refetch: refetchMetaAds, isFetching: isFetchingMetaAds } = useMetaAdsData();
-  const { data: schemaData } = useMetaAdsSchema();
+
+  // BigQuery connection state
+  const [bqConnection, setBqConnection] = useState<BigQueryConnection>({
+    projectId: '',
+    datasetId: '',
+    tableId: '',
+  });
+
+  const { data: bqTableData, isLoading: isLoadingMetaAds, error: metaAdsError, refetch: refetchMetaAds, isFetching: isFetchingMetaAds } = useBigQueryTableData(
+    bqConnection.projectId || null,
+    bqConnection.datasetId || null,
+    bqConnection.tableId || null,
+  );
+  const metaAdsData = bqTableData?.rows || [];
+  const { data: schemaData } = useBigQuerySchema(
+    bqConnection.projectId || null,
+    bqConnection.datasetId || null,
+    bqConnection.tableId || null,
+  );
 
   const handleSignOut = async () => {
     await signOut();
@@ -111,6 +128,14 @@ function ViewDashboardContent() {
   const sheets = useMemo(() => dashboard?.sheets_data || [], [dashboard]);
   const [activeSheetId, setActiveSheetId] = useState<string>("");
 
+  // Auto-load saved BigQuery connection from dashboard
+  useEffect(() => {
+    const savedConn = sheets[0]?.bigQueryConnection;
+    if (savedConn?.projectId && savedConn?.datasetId && savedConn?.tableId) {
+      setBqConnection(savedConn);
+    }
+  }, [sheets]);
+
   const activeSheet = useMemo(() => {
     if (sheets.length === 0) return null;
     const sheetId = activeSheetId || sheets[0]?.id;
@@ -119,19 +144,17 @@ function ViewDashboardContent() {
 
   // Apply filters to meta ads data
   // Slicer fields are stored as DB column names (e.g. "campaign_name", "spend")
-  // which match the MetaAdsCampaign keys directly — no aliasing needed.
   const filteredMetaAdsData = useMemo(() => {
     if (metaAdsData.length === 0) return [];
-    const asRecords = metaAdsData as unknown as Record<string, unknown>[];
-    const filtered = getFilteredData(asRecords);
-    return filtered as unknown as typeof metaAdsData;
+    const asRecords = metaAdsData as Record<string, unknown>[];
+    return getFilteredData(asRecords) as Record<string, any>[];
   }, [metaAdsData, getFilteredData, filters]);
 
   // Build a default ChartConfig for a visual type when none is saved
   const buildDefaultConfig = useCallback((visualType: VisualType): ChartConfig | null => {
     if (!schemaData) return null;
-    const defaultMeasure = schemaData.measures[0] || "clicks";
-    const defaultDimension = schemaData.dimensions.find(d => d === "campaign_name") || schemaData.dimensions[0] || "campaign_name";
+    const defaultMeasure = schemaData.measures[0] || "";
+    const defaultDimension = schemaData.dimensions[0] || "";
 
     switch (visualType) {
       case "card":
@@ -191,7 +214,7 @@ function ViewDashboardContent() {
   // Get slicer values from database (unfiltered for full range)
   const getSlicerValues = useCallback((field: string): (string | number)[] => {
     if (metaAdsData.length === 0) return [];
-    const dbField = normalizeField(field) as keyof typeof metaAdsData[0];
+    const dbField = normalizeField(field);
     return getUniqueValues(metaAdsData, dbField);
   }, [metaAdsData, normalizeField]);
 
@@ -320,7 +343,12 @@ function ViewDashboardContent() {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col overflow-hidden">
+      <main className="flex-1 flex overflow-hidden">
+        {/* Left sidebar - BigQuery Config */}
+        <aside className="w-64 border-r bg-card flex flex-col overflow-y-auto flex-shrink-0">
+          <BigQueryConfig connection={bqConnection} onConnectionChange={setBqConnection} />
+        </aside>
+        <div className="flex-1 flex flex-col overflow-hidden">
         <div className="flex-1 p-4 bg-muted/30 canvas-grid overflow-auto relative">
           {/* Fixed-width A4-like canvas container - matches editor */}
           <div 
@@ -514,6 +542,7 @@ function ViewDashboardContent() {
             onRenameSheet={() => {}}
           />
         )}
+        </div>
       </main>
     </div>
   );
