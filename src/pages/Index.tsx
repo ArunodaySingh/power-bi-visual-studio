@@ -27,7 +27,7 @@ import {
   AlertCircle,
   Save,
   ArrowLeft,
-  LogOut,
+  
   Filter,
   Type,
   Eye,
@@ -95,7 +95,7 @@ import {
   CrossFilterProvider,
   useCrossFilter,
 } from '@/contexts/CrossFilterContext';
-import { useAuth } from '@/contexts/AuthContext';
+
 import {
   useBigQuerySchema,
   useBigQueryTableData,
@@ -128,7 +128,7 @@ import {
 
 // Utilities
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
+
 import {
   startOfWeek,
   startOfMonth,
@@ -321,7 +321,7 @@ const getDefaultSlicerField = (
 function DashboardContent() {
   // ========== HOOKS & CONTEXTS ==========
   const navigate = useNavigate();
-  const { user, signOut } = useAuth(); // Authentication
+  
   const { filters, addFilter, removeFilter, getFilteredData } = useFilters(); // Global filters
   const { crossFilter, setCrossFilter, clearCrossFilter } = useCrossFilter(); // Cross-filtering between charts
 
@@ -354,10 +354,6 @@ function DashboardContent() {
     bqConnection.tableId || null,
   );
 
-  const handleSignOut = async () => {
-    await signOut();
-    navigate('/');
-  };
 
   // ========== STATE MANAGEMENT ==========
 
@@ -737,20 +733,13 @@ function DashboardContent() {
    * Converts Map structures to plain objects for JSON serialization
    */
   const handleSaveDashboard = useCallback(async () => {
-    // Validate required fields
     if (!dashboardName.trim()) {
       toast.error('Please enter a dashboard name');
-      return;
-    }
-    if (!user) {
-      toast.error('You must be logged in to save dashboards');
       return;
     }
 
     setIsSaving(true);
     try {
-      // Convert slotVisuals Map to plain object for JSON storage
-      // Also persist visualConfigs so view mode can recompute data dynamically
       const configsObj = Object.fromEntries(visualConfigs);
       const sheetsForStorage = sheets.map((sheet) => ({
         ...sheet,
@@ -759,30 +748,30 @@ function DashboardContent() {
         bigQueryConnection: bqConnection,
       }));
 
-      // Insert dashboard into Supabase
-      const { error } = await supabase.from('dashboards').insert([
-        {
-          name: dashboardName.trim(),
-          description: dashboardDescription.trim() || null,
-          sheets_data: JSON.parse(JSON.stringify(sheetsForStorage)),
-          user_id: user.id,
-        },
-      ]);
+      // Export as JSON download
+      const blob = new Blob([JSON.stringify({
+        name: dashboardName.trim(),
+        description: dashboardDescription.trim() || null,
+        sheets_data: sheetsForStorage,
+      }, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${dashboardName.trim().replace(/\s+/g, '_')}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
 
-      if (error) throw error;
-
-      toast.success('Dashboard saved successfully!');
+      toast.success('Dashboard exported successfully!');
       setShowSaveDialog(false);
       setDashboardName('');
       setDashboardDescription('');
-      navigate('/dashboards');
     } catch (error) {
       console.error('Error saving dashboard:', error);
-      toast.error('Failed to save dashboard');
+      toast.error('Failed to export dashboard');
     } finally {
       setIsSaving(false);
     }
-  }, [dashboardName, dashboardDescription, sheets, navigate, user]);
+  }, [dashboardName, dashboardDescription, sheets]);
 
   // ========== SHEET HANDLERS ==========
 
@@ -2048,14 +2037,6 @@ function DashboardContent() {
                 <Button size='sm' onClick={() => setShowSaveDialog(true)}>
                   <Save className='h-4 w-4 mr-2' />
                   Save Dashboard
-                </Button>
-                <Button
-                  variant='ghost'
-                  size='sm'
-                  onClick={handleSignOut}
-                  title='Sign Out'
-                >
-                  <LogOut className='h-4 w-4' />
                 </Button>
               </div>
             </div>
