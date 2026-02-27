@@ -18,7 +18,7 @@ export default function Landing() {
           </div>
           <h1 className="text-4xl font-bold tracking-tight">Custom Dashboard</h1>
           <p className="text-muted-foreground text-lg max-w-md mx-auto">
-            Create interactive dashboards with drag-and-drop visuals, or view your saved dashboards
+            Connect to BigQuery and create interactive dashboards with drag-and-drop visuals
           </p>
         </div>
 
