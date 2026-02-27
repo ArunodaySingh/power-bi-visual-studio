@@ -24,9 +24,16 @@ const App = () => (
           <Routes>
             <Route path='/' element={<Landing />} />
             <Route path='/auth' element={<Auth />} />
-            <Route path='/create' element={<Index />} />
             <Route
-              path='/x'
+              path='/create'
+              element={
+                <ProtectedRoute>
+                  <Index />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path='/dashboards'
               element={
                 <ProtectedRoute>
                   <DashboardList />

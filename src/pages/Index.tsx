@@ -6,12 +6,12 @@
  * - Add chart visuals to panel slots
  * - Configure chart data using Measure/GroupBy/Date dropdowns
  * - Add filter slicers for data filtering
- * - Save dashboards to the database
+ * - Export dashboards as JSON
  *
  * Architecture:
  * - Uses DndContext from @dnd-kit for drag-and-drop functionality
  * - Manages state for sheets, panels, visuals, and slicers
- * - Integrates with Supabase for data fetching and persistence
+ * - Integrates with BigQuery for data fetching
  */
 
 import { useState, useCallback, useEffect, useRef } from 'react';
@@ -27,7 +27,7 @@ import {
   AlertCircle,
   Save,
   ArrowLeft,
-  LogOut,
+  
   Filter,
   Type,
   Eye,
@@ -95,12 +95,14 @@ import {
   CrossFilterProvider,
   useCrossFilter,
 } from '@/contexts/CrossFilterContext';
-import { useAuth } from '@/contexts/AuthContext';
-import { useMetaAdsData, getUniqueValues } from '@/hooks/useMetaAdsData';
+
 import {
-  useMetaAdsSchema,
+  useBigQuerySchema,
+  useBigQueryTableData,
   getColumnDisplayName,
-} from '@/hooks/useMetaAdsSchema';
+  getUniqueValues,
+} from '@/hooks/useBigQueryData';
+import { BigQueryConfig, type BigQueryConnection } from '@/components/BigQueryConfig';
 
 // Slicer components
 import {
@@ -126,7 +128,7 @@ import {
 
 // Utilities
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
+
 import {
   startOfWeek,
   startOfMonth,
@@ -313,40 +315,53 @@ const getDefaultSlicerField = (
  * - Multiple sheets with panels, visuals, and slicers
  * - Drag and drop for adding elements
  * - Chart configuration via dropdowns
- * - Data fetching from Supabase
- * - Dashboard saving functionality
+ * - Data fetching from BigQuery
+ * - Dashboard export functionality
  */
 function DashboardContent() {
   // ========== HOOKS & CONTEXTS ==========
   const navigate = useNavigate();
-  const { user, signOut } = useAuth(); // Authentication
+  
   const { filters, addFilter, removeFilter, getFilteredData } = useFilters(); // Global filters
   const { crossFilter, setCrossFilter, clearCrossFilter } = useCrossFilter(); // Cross-filtering between charts
 
-  // Fetch Meta Ads data from Supabase
+  // BigQuery connection state
+  const [bqConnection, setBqConnection] = useState<BigQueryConnection>({
+    projectId: '',
+    datasetId: '',
+    tableId: '',
+  });
+
+  // Fetch BigQuery data
   const {
-    data: metaAdsData = [],
+    data: bqTableData,
     isLoading: isLoadingMetaAds,
     error: metaAdsError,
     refetch: refetchMetaAds,
     isFetching: isFetchingMetaAds,
-  } = useMetaAdsData();
+  } = useBigQueryTableData(
+    bqConnection.projectId || null,
+    bqConnection.datasetId || null,
+    bqConnection.tableId || null,
+  );
+
+  const metaAdsData = bqTableData?.rows || [];
 
   // Fetch schema for default config values
-  const { data: schemaData } = useMetaAdsSchema();
+  const { data: schemaData, isLoading: isSchemaLoading } = useBigQuerySchema(
+    bqConnection.projectId || null,
+    bqConnection.datasetId || null,
+    bqConnection.tableId || null,
+  );
 
-  const handleSignOut = async () => {
-    await signOut();
-    navigate('/');
-  };
 
   // ========== STATE MANAGEMENT ==========
 
   // Sheet state - each sheet contains panels, visuals, and slicers
   const [sheets, setSheets] = useState<SheetData[]>([
-    createEmptySheet('Meta Ads'),
-    createEmptySheet('GA'),
-    createEmptySheet('DV360'),
+    createEmptySheet('Sheet 1'),
+    createEmptySheet('Sheet 2'),
+    createEmptySheet('Sheet 3'),
   ]);
   const [activeSheetId, setActiveSheetId] = useState(sheets[0].id);
 
@@ -714,55 +729,49 @@ function DashboardContent() {
 
   // ========== SAVE DASHBOARD HANDLER ==========
   /**
-   * Saves the current dashboard to Supabase
+   * Exports the current dashboard as JSON
    * Converts Map structures to plain objects for JSON serialization
    */
   const handleSaveDashboard = useCallback(async () => {
-    // Validate required fields
     if (!dashboardName.trim()) {
       toast.error('Please enter a dashboard name');
-      return;
-    }
-    if (!user) {
-      toast.error('You must be logged in to save dashboards');
       return;
     }
 
     setIsSaving(true);
     try {
-      // Convert slotVisuals Map to plain object for JSON storage
-      // Also persist visualConfigs so view mode can recompute data dynamically
       const configsObj = Object.fromEntries(visualConfigs);
       const sheetsForStorage = sheets.map((sheet) => ({
         ...sheet,
         slotVisuals: Object.fromEntries(sheet.slotVisuals),
         visualConfigs: configsObj,
+        bigQueryConnection: bqConnection,
       }));
 
-      // Insert dashboard into Supabase
-      const { error } = await supabase.from('dashboards').insert([
-        {
-          name: dashboardName.trim(),
-          description: dashboardDescription.trim() || null,
-          sheets_data: JSON.parse(JSON.stringify(sheetsForStorage)),
-          user_id: user.id,
-        },
-      ]);
+      // Export as JSON download
+      const blob = new Blob([JSON.stringify({
+        name: dashboardName.trim(),
+        description: dashboardDescription.trim() || null,
+        sheets_data: sheetsForStorage,
+      }, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${dashboardName.trim().replace(/\s+/g, '_')}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
 
-      if (error) throw error;
-
-      toast.success('Dashboard saved successfully!');
+      toast.success('Dashboard exported successfully!');
       setShowSaveDialog(false);
       setDashboardName('');
       setDashboardDescription('');
-      navigate('/dashboards');
     } catch (error) {
       console.error('Error saving dashboard:', error);
-      toast.error('Failed to save dashboard');
+      toast.error('Failed to export dashboard');
     } finally {
       setIsSaving(false);
     }
-  }, [dashboardName, dashboardDescription, sheets, navigate, user]);
+  }, [dashboardName, dashboardDescription, sheets]);
 
   // ========== SHEET HANDLERS ==========
 
@@ -1189,14 +1198,9 @@ function DashboardContent() {
   // Field-drop handler removed - using dropdown configuration instead
 
   // Get available values for slicer field from database
-  // Field comes directly as database column name from the schema
   const getSlicerValues = (field: string): (string | number)[] => {
     if (metaAdsData.length === 0) return [];
-
-    // Field is now the actual database column name from the dynamic schema
-    // Just use it directly
-    const dbField = field as keyof (typeof metaAdsData)[0];
-    return getUniqueValues(metaAdsData, dbField);
+    return getUniqueValues(metaAdsData, field);
   };
 
   // Handle cross-filter click from visual
@@ -1285,8 +1289,8 @@ function DashboardContent() {
             (c) => typeof record[c as keyof typeof record] === 'number',
           );
           row.category = firstDimCol
-            ? String(record[firstDimCol as keyof typeof record])
-            : String(record.campaign_name);
+            ? String(record[firstDimCol])
+            : String(Object.values(record).find(v => typeof v === 'string') || 'Unknown');
           row.value = firstMeasureCol
             ? Number(record[firstMeasureCol as keyof typeof record])
             : 0;
@@ -1890,6 +1894,10 @@ function DashboardContent() {
             <div
               className={`w-64 h-full flex flex-col ${showLeftPanel ? '' : 'invisible'}`}
             >
+              <BigQueryConfig
+                connection={bqConnection}
+                onConnectionChange={setBqConnection}
+              />
               <ComponentPalette
                 onAddVisual={handleAddVisual}
                 onAddSlicer={handleAddSlicer}
@@ -2040,14 +2048,6 @@ function DashboardContent() {
                 <Button size='sm' onClick={() => setShowSaveDialog(true)}>
                   <Save className='h-4 w-4 mr-2' />
                   Save Dashboard
-                </Button>
-                <Button
-                  variant='ghost'
-                  size='sm'
-                  onClick={handleSignOut}
-                  title='Sign Out'
-                >
-                  <LogOut className='h-4 w-4' />
                 </Button>
               </div>
             </div>
@@ -2258,6 +2258,8 @@ function DashboardContent() {
                           handleChartConfigChange(selectedVisual.id, config)
                         }
                         visualType={selectedVisual.type}
+                        schema={schemaData}
+                        isSchemaLoading={isSchemaLoading}
                       />
                     ) : selectedPanel ? (
                       <div className='space-y-3'>
@@ -2283,6 +2285,8 @@ function DashboardContent() {
                         onUpdate={(updates) =>
                           handleUpdateSlicer(selectedSlicer.id, updates)
                         }
+                        schema={schemaData}
+                        isSchemaLoading={isSchemaLoading}
                       />
                     ) : (
                       <div className='text-sm text-muted-foreground text-center py-8'>

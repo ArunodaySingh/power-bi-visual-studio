@@ -1,1 +1,4 @@
 project_id = "xihteirouywspbrforec"
+
+[functions.bigquery-proxy]
+verify_jwt = false

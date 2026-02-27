@@ -1,5 +1,5 @@
 /**
- * Shared data aggregation utility for computing visual data from raw meta ads records.
+ * Shared data aggregation utility for computing visual data from raw records.
  * Used by both the editor (Index.tsx) and the viewer (ViewDashboard.tsx).
  */
 
@@ -7,7 +7,6 @@ import { format, startOfWeek, startOfMonth, startOfQuarter, startOfYear } from "
 import type { ChartConfig } from "@/components/ChartConfigDropdowns";
 import type { DataPoint } from "@/components/DataEditor";
 import type { TimeGranularity } from "@/types/dashboard";
-import type { MetaAdsCampaign } from "@/hooks/useMetaAdsData";
 
 function getTimePeriodKey(dateStr: string, granularity: TimeGranularity): string {
   if (granularity === "none" || !dateStr) return dateStr;
@@ -33,7 +32,7 @@ function isRateField(key: string) {
  * Aggregates raw data into chart-ready DataPoint[] based on a ChartConfig.
  */
 export function aggregateVisualData(
-  data: MetaAdsCampaign[],
+  data: Record<string, any>[],
   config: ChartConfig,
   visualType: string
 ): DataPoint[] {
@@ -46,13 +45,13 @@ export function aggregateVisualData(
     return data.slice(0, 100).map((record) => {
       const row: Record<string, string | number> = { id: crypto.randomUUID() };
       selectedColumns.forEach((col) => {
-        const value = record[col as keyof MetaAdsCampaign];
+        const value = record[col];
         row[col] = value !== undefined && value !== null ? (value as string | number) : '';
       });
-      const firstDimCol = selectedColumns.find(c => typeof record[c as keyof MetaAdsCampaign] === 'string');
-      const firstMeasureCol = selectedColumns.find(c => typeof record[c as keyof MetaAdsCampaign] === 'number');
-      row.category = firstDimCol ? String(record[firstDimCol as keyof MetaAdsCampaign]) : String(record.campaign_name);
-      row.value = firstMeasureCol ? Number(record[firstMeasureCol as keyof MetaAdsCampaign]) : 0;
+      const firstDimCol = selectedColumns.find(c => typeof record[c] === 'string');
+      const firstMeasureCol = selectedColumns.find(c => typeof record[c] === 'number');
+      row.category = firstDimCol ? String(record[firstDimCol]) : String(Object.values(record).find(v => typeof v === 'string') || 'Unknown');
+      row.value = firstMeasureCol ? Number(record[firstMeasureCol]) : 0;
       return row as DataPoint;
     });
   }
@@ -63,7 +62,7 @@ export function aggregateVisualData(
     const measureKey = config.measure;
     const calculation = config.calculation || "sum";
     const values = data
-      .map(r => r[measureKey as keyof MetaAdsCampaign])
+      .map(r => r[measureKey])
       .filter((v): v is number => typeof v === 'number');
     
     let aggregateValue = 0;
@@ -93,10 +92,10 @@ export function aggregateVisualData(
     const agg = new Map<string, { sum: number; count: number }>();
     
     data.forEach((record) => {
-      const rowParts = rowFields.map(f => String(record[f as keyof MetaAdsCampaign] || "Unknown"));
-      const colParts = colFields.map(f => String(record[f as keyof MetaAdsCampaign] || "Unknown"));
+      const rowParts = rowFields.map(f => String(record[f] || "Unknown"));
+      const colParts = colFields.map(f => String(record[f] || "Unknown"));
       const groupKey = [...rowParts, ...colParts].join(" | ") || "Total";
-      const rawValue = record[measureKey as keyof MetaAdsCampaign];
+      const rawValue = record[measureKey];
       const value = typeof rawValue === "number" ? rawValue : 0;
       if (!agg.has(groupKey)) agg.set(groupKey, { sum: 0, count: 0 });
       const entry = agg.get(groupKey)!;
@@ -131,15 +130,19 @@ export function aggregateVisualData(
   const agg = new Map<string, { sum: number; count: number; sum2: number; count2: number }>();
 
   data.forEach((record) => {
+<<<<<<< HEAD
     let groupValue = groupByKeys
       .map((key) => String(record[key as keyof MetaAdsCampaign] || "Unknown"))
       .join(" | ");
+=======
+    let groupValue = String(record[groupByKey] || "Unknown");
+>>>>>>> f9a21396f9c7fce405eb9c4287a75145b32e977a
     if (timeGranularity !== "none" && record.date) {
       groupValue = `${groupValue} - ${getTimePeriodKey(record.date, timeGranularity)}`;
     }
-    const rawValue = record[measureKey as keyof MetaAdsCampaign];
+    const rawValue = record[measureKey];
     const value = typeof rawValue === "number" ? rawValue : 0;
-    const rawValue2 = measure2Key ? record[measure2Key as keyof MetaAdsCampaign] : 0;
+    const rawValue2 = measure2Key ? record[measure2Key] : 0;
     const value2 = typeof rawValue2 === "number" ? rawValue2 : 0;
 
     if (!agg.has(groupValue)) agg.set(groupValue, { sum: 0, count: 0, sum2: 0, count2: 0 });

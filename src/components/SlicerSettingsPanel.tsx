@@ -13,22 +13,24 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Filter, Loader2 } from "lucide-react";
-import { useMetaAdsSchema, getColumnDisplayName } from "@/hooks/useMetaAdsSchema";
+import { getColumnDisplayName } from "@/hooks/useBigQueryData";
 import type { SlicerData } from "@/types/dashboard";
 
 interface SlicerSettingsPanelProps {
   slicer: SlicerData;
   onUpdate: (updates: Partial<SlicerData>) => void;
+  schema?: { measures: string[]; dimensions: string[] } | null;
+  isSchemaLoading?: boolean;
 }
 
-export function SlicerSettingsPanel({ slicer, onUpdate }: SlicerSettingsPanelProps) {
-  const { data: schema, isLoading } = useMetaAdsSchema();
+export function SlicerSettingsPanel({ slicer, onUpdate, schema, isSchemaLoading }: SlicerSettingsPanelProps) {
+  const isLoading = isSchemaLoading ?? false;
   
   const isDropdownOrList = slicer.type === "dropdown" || slicer.type === "list";
   const isDateRange = slicer.type === "date-range";
   const isNumericRange = slicer.type === "numeric-range";
   
-  // Dynamic measures and dimensions from database
+  // Dynamic measures and dimensions from schema prop
   const metaMetrics = schema?.measures || [];
   const groupByDimensions = schema?.dimensions || [];
 
