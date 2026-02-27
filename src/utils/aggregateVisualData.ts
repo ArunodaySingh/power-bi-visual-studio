@@ -115,18 +115,25 @@ export function aggregateVisualData(
   }
 
   // Standard chart types (bar, line, pie, area, multiline, combo, etc.)
-  if (!config.measure || !config.groupBy) return [];
+  const groupByKeys = Array.from(
+    new Set([
+      ...(config.groupBy ? [config.groupBy] : []),
+      ...(config.groupByFields || []),
+    ]),
+  );
+  if (!config.measure || groupByKeys.length === 0) return [];
 
   const measureKey = config.measure;
   const measure2Key = config.measure2 || null;
-  const groupByKey = config.groupBy;
   const timeGranularity = (config.dateGranularity || "none") as TimeGranularity;
   const isMultiLine = visualType === "multiline" && config.measure2;
 
   const agg = new Map<string, { sum: number; count: number; sum2: number; count2: number }>();
 
   data.forEach((record) => {
-    let groupValue = String(record[groupByKey as keyof MetaAdsCampaign] || "Unknown");
+    let groupValue = groupByKeys
+      .map((key) => String(record[key as keyof MetaAdsCampaign] || "Unknown"))
+      .join(" | ");
     if (timeGranularity !== "none" && record.date) {
       groupValue = `${groupValue} - ${getTimePeriodKey(record.date, timeGranularity)}`;
     }
@@ -143,7 +150,7 @@ export function aggregateVisualData(
     entry.count2 += 1;
   });
 
-  let result: DataPoint[] = Array.from(agg.entries())
+  const result: DataPoint[] = Array.from(agg.entries())
     .map(([category, { sum, count, sum2, count2 }]) => {
       const dp: DataPoint = {
         id: crypto.randomUUID(),

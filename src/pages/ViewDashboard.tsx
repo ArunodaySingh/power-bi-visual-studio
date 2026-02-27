@@ -141,11 +141,11 @@ function ViewDashboardContent() {
       case "matrix":
         return { measure: defaultMeasure, groupBy: "", dateGranularity: "none", matrixRows: [defaultDimension], matrixColumns: [] };
       case "pie":
-        return { measure: defaultMeasure, groupBy: defaultDimension, dateGranularity: "none" };
+        return { measure: defaultMeasure, groupBy: defaultDimension, groupByFields: [defaultDimension], dateGranularity: "none" };
       case "multiline":
-        return { measure: defaultMeasure, measure2: schemaData.measures[1] || defaultMeasure, groupBy: defaultDimension, dateGranularity: "none" };
+        return { measure: defaultMeasure, measure2: schemaData.measures[1] || defaultMeasure, groupBy: defaultDimension, groupByFields: [defaultDimension], dateGranularity: "none" };
       default:
-        return { measure: defaultMeasure, groupBy: defaultDimension, dateGranularity: "none" };
+        return { measure: defaultMeasure, groupBy: defaultDimension, groupByFields: [defaultDimension], dateGranularity: "none" };
     }
   }, [schemaData]);
 

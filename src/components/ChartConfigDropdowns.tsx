@@ -60,6 +60,7 @@ export interface ChartConfig {
   measure: string;
   measure2?: string;  // For multi-line charts
   groupBy: string;
+  groupByFields?: string[];  // Multi-dimension grouping for charts
   dateGranularity: DateGranularity;
   calculation?: CalculationType;  // For KPI cards
   selectedColumns?: string[];  // For tables
@@ -94,7 +95,16 @@ export function ChartConfigDropdowns({ config, onChange, visualType }: ChartConf
   // Dynamic measures and dimensions from database
   const metaMetrics = schema?.measures || [];
   const groupByDimensions = schema?.dimensions || [];
-  const allColumns = schema?.allColumns || [];
+  const selectedGroupByFields = Array.from(
+    new Set([
+      ...(config.groupBy ? [config.groupBy] : []),
+      ...(config.groupByFields || []),
+    ]),
+  );
+  const groupedByLabel =
+    selectedGroupByFields.length > 0
+      ? selectedGroupByFields.map((field) => getColumnDisplayName(field)).join(" + ")
+      : "";
 
   const handleMeasureChange = (value: string) => {
     onChange({ ...config, measure: value });
@@ -105,7 +115,27 @@ export function ChartConfigDropdowns({ config, onChange, visualType }: ChartConf
   };
 
   const handleGroupByChange = (value: string) => {
-    onChange({ ...config, groupBy: value });
+    const others = selectedGroupByFields.filter((field) => field !== value);
+    onChange({ ...config, groupBy: value, groupByFields: [value, ...others] });
+  };
+
+  const handleGroupByFieldToggle = (field: string) => {
+    if (selectedGroupByFields.includes(field)) {
+      const updatedFields = selectedGroupByFields.filter((item) => item !== field);
+      onChange({
+        ...config,
+        groupBy: updatedFields[0] || "",
+        groupByFields: updatedFields,
+      });
+      return;
+    }
+
+    const updatedFields = [...selectedGroupByFields, field];
+    onChange({
+      ...config,
+      groupBy: config.groupBy || field,
+      groupByFields: updatedFields,
+    });
   };
 
   const handleDateChange = (value: string) => {
@@ -410,7 +440,7 @@ export function ChartConfigDropdowns({ config, onChange, visualType }: ChartConf
 
         <div className="space-y-2">
           <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-            Group By
+            Primary Group By
           </Label>
           <Select value={config.groupBy} onValueChange={handleGroupByChange}>
             <SelectTrigger className="w-full">
@@ -424,6 +454,28 @@ export function ChartConfigDropdowns({ config, onChange, visualType }: ChartConf
               ))}
             </SelectContent>
           </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            Include Dimensions
+          </Label>
+          <ScrollArea className="h-[140px] border rounded-md p-2">
+            <div className="space-y-1">
+              {groupByDimensions.map((dimension) => (
+                <div key={dimension} className="flex items-center space-x-2 py-1">
+                  <Checkbox
+                    id={`multiline-group-${dimension}`}
+                    checked={selectedGroupByFields.includes(dimension)}
+                    onCheckedChange={() => handleGroupByFieldToggle(dimension)}
+                  />
+                  <label htmlFor={`multiline-group-${dimension}`} className="text-sm cursor-pointer">
+                    {getColumnDisplayName(dimension)}
+                  </label>
+                </div>
+              ))}
+            </div>
+          </ScrollArea>
         </div>
 
         <div className="space-y-2">
@@ -462,12 +514,12 @@ export function ChartConfigDropdowns({ config, onChange, visualType }: ChartConf
           </Select>
         </div>
 
-        {config.measure && config.measure2 && config.groupBy && (
+        {config.measure && config.measure2 && selectedGroupByFields.length > 0 && (
           <div className="pt-3 border-t">
             <p className="text-sm text-muted-foreground">
               Comparing <span className="font-medium text-foreground">{getColumnDisplayName(config.measure)}</span> vs{" "}
               <span className="font-medium text-foreground">{getColumnDisplayName(config.measure2)}</span> by{" "}
-              <span className="font-medium text-foreground">{getColumnDisplayName(config.groupBy)}</span>
+              <span className="font-medium text-foreground">{groupedByLabel}</span>
             </p>
           </div>
         )}
@@ -506,7 +558,7 @@ export function ChartConfigDropdowns({ config, onChange, visualType }: ChartConf
 
         <div className="space-y-2">
           <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-            Legend
+            Primary Legend
           </Label>
           <Select value={config.groupBy} onValueChange={handleGroupByChange}>
             <SelectTrigger className="w-full">
@@ -522,11 +574,33 @@ export function ChartConfigDropdowns({ config, onChange, visualType }: ChartConf
           </Select>
         </div>
 
-        {config.measure && config.groupBy && (
+        <div className="space-y-2">
+          <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            Include Dimensions
+          </Label>
+          <ScrollArea className="h-[140px] border rounded-md p-2">
+            <div className="space-y-1">
+              {groupByDimensions.map((dimension) => (
+                <div key={dimension} className="flex items-center space-x-2 py-1">
+                  <Checkbox
+                    id={`pie-group-${dimension}`}
+                    checked={selectedGroupByFields.includes(dimension)}
+                    onCheckedChange={() => handleGroupByFieldToggle(dimension)}
+                  />
+                  <label htmlFor={`pie-group-${dimension}`} className="text-sm cursor-pointer">
+                    {getColumnDisplayName(dimension)}
+                  </label>
+                </div>
+              ))}
+            </div>
+          </ScrollArea>
+        </div>
+
+        {config.measure && selectedGroupByFields.length > 0 && (
           <div className="pt-3 border-t">
             <p className="text-sm text-muted-foreground">
               Showing <span className="font-medium text-foreground">{getColumnDisplayName(config.measure)}</span> by{" "}
-              <span className="font-medium text-foreground">{getColumnDisplayName(config.groupBy)}</span>
+              <span className="font-medium text-foreground">{groupedByLabel}</span>
             </p>
           </div>
         )}
@@ -564,7 +638,7 @@ export function ChartConfigDropdowns({ config, onChange, visualType }: ChartConf
 
       <div className="space-y-2">
         <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-          Group By
+          Primary Group By
         </Label>
         <Select value={config.groupBy} onValueChange={handleGroupByChange}>
           <SelectTrigger className="w-full">
@@ -578,6 +652,28 @@ export function ChartConfigDropdowns({ config, onChange, visualType }: ChartConf
             ))}
           </SelectContent>
         </Select>
+      </div>
+
+      <div className="space-y-2">
+        <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+          Include Dimensions
+        </Label>
+        <ScrollArea className="h-[140px] border rounded-md p-2">
+          <div className="space-y-1">
+            {groupByDimensions.map((dimension) => (
+              <div key={dimension} className="flex items-center space-x-2 py-1">
+                <Checkbox
+                  id={`chart-group-${dimension}`}
+                  checked={selectedGroupByFields.includes(dimension)}
+                  onCheckedChange={() => handleGroupByFieldToggle(dimension)}
+                />
+                <label htmlFor={`chart-group-${dimension}`} className="text-sm cursor-pointer">
+                  {getColumnDisplayName(dimension)}
+                </label>
+              </div>
+            ))}
+          </div>
+        </ScrollArea>
       </div>
 
       <div className="space-y-2">
@@ -616,11 +712,11 @@ export function ChartConfigDropdowns({ config, onChange, visualType }: ChartConf
         </Select>
       </div>
 
-      {config.measure && config.groupBy && (
+      {config.measure && selectedGroupByFields.length > 0 && (
         <div className="pt-3 border-t">
           <p className="text-sm text-muted-foreground">
             Showing <span className="font-medium text-foreground">{getColumnDisplayName(config.measure)}</span> by{" "}
-            <span className="font-medium text-foreground">{getColumnDisplayName(config.groupBy)}</span>
+            <span className="font-medium text-foreground">{groupedByLabel}</span>
             {config.dateGranularity !== "none" && (
               <> split by <span className="font-medium text-foreground">{config.dateGranularity}</span></>
             )}

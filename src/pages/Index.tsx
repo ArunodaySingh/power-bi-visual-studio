@@ -1296,7 +1296,7 @@ function DashboardContent() {
         handleUpdateVisual(visualId, {
           data: tableData,
           properties: {
-            ...visual?.properties!,
+            ...(visual?.properties || createDefaultProperties()),
             title: `Data Table (${selectedColumns.length} columns)`,
           },
         });
@@ -1430,15 +1430,20 @@ function DashboardContent() {
         return;
       }
 
-      // For other chart types, require measure and groupBy
-      if (!config.measure || !config.groupBy || metaAdsData.length === 0)
+      // For other chart types, require measure and at least one grouping dimension
+      const groupByKeys = Array.from(
+        new Set([
+          ...(config.groupBy ? [config.groupBy] : []),
+          ...(config.groupByFields || []),
+        ]),
+      );
+      if (!config.measure || groupByKeys.length === 0 || metaAdsData.length === 0)
         return;
 
       // Use column names directly - they now come from the dynamic schema
       // and are already the actual database column names
       const measureKey = config.measure;
       const measure2Key = config.measure2 || null;
-      const groupByKey = config.groupBy;
       const timeGranularity = config.dateGranularity as TimeGranularity;
       const isMultiLine = visual?.type === 'multiline' && config.measure2;
 
@@ -1450,9 +1455,9 @@ function DashboardContent() {
       >();
 
       metaAdsData.forEach((record) => {
-        let groupValue = String(
-          record[groupByKey as keyof typeof record] || 'Unknown',
-        );
+        let groupValue = groupByKeys
+          .map((key) => String(record[key as keyof typeof record] || 'Unknown'))
+          .join(' | ');
 
         // If date granularity is set, append time period
         if (timeGranularity !== 'none' && record.date) {
@@ -1552,7 +1557,9 @@ function DashboardContent() {
 
       // Build title using display names for readability
       const measureDisplayName = getColumnDisplayName(config.measure);
-      const groupByDisplayName = getColumnDisplayName(config.groupBy);
+      const groupByDisplayName = groupByKeys
+        .map((key) => getColumnDisplayName(key))
+        .join(' + ');
       const timeLabel =
         config.dateGranularity !== 'none'
           ? ` by ${config.dateGranularity}`
@@ -1571,7 +1578,7 @@ function DashboardContent() {
       handleUpdateVisual(visualId, {
         data: newData,
         properties: {
-          ...visual?.properties!,
+          ...(visual?.properties || createDefaultProperties()),
           title,
         },
         valueFieldNames,
@@ -1644,10 +1651,11 @@ function DashboardContent() {
           defaultConfig = {
             measure: defaultMeasure,
             groupBy: defaultDimension,
+            groupByFields: [defaultDimension],
             dateGranularity: 'none',
           };
           break;
-        case 'multiline':
+        case 'multiline': {
           // Multi-line needs two measures
           const secondMeasure =
             schemaData.measures[1] || schemaData.measures[0] || 'spend';
@@ -1655,14 +1663,17 @@ function DashboardContent() {
             measure: defaultMeasure,
             measure2: secondMeasure,
             groupBy: defaultDimension,
+            groupByFields: [defaultDimension],
             dateGranularity: 'none',
           };
           break;
+        }
         default:
           // Standard charts (bar, line, area, combo)
           defaultConfig = {
             measure: defaultMeasure,
             groupBy: defaultDimension,
+            groupByFields: [defaultDimension],
             dateGranularity: 'none',
           };
       }

@@ -453,6 +453,7 @@ export function VisualPreview({
           </div>
         );
 
+      case "waterfall":
         // Calculate cumulative values for waterfall
         let cumulative = 0;
         const waterfallData = chartData.map((d, i) => {
