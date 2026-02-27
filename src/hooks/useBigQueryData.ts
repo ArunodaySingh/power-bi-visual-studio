@@ -1,5 +1,4 @@
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 
 export interface BigQueryTable {
   id: string;
@@ -18,12 +17,16 @@ export interface BigQueryDataset {
   name: string;
 }
 
+const API_BASE = import.meta.env.VITE_BIGQUERY_API_URL || "http://localhost:3001";
+
 async function callBigQueryProxy(body: Record<string, any>) {
-  const { data, error } = await supabase.functions.invoke("bigquery-proxy", {
-    body,
+  const res = await fetch(`${API_BASE}/api/bigquery`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
   });
-  if (error) throw new Error(error.message || "BigQuery proxy call failed");
-  if (data?.error) throw new Error(data.error);
+  const data = await res.json();
+  if (!res.ok || data?.error) throw new Error(data?.error || "BigQuery API call failed");
   return data;
 }
 
